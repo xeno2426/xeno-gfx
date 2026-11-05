@@ -37,3 +37,9 @@ obj/
 
 # Google Services (API keys)
 google-services.json
+
+# Node & Tooling
+node_modules/
+package-lock.json
+package.json
+
