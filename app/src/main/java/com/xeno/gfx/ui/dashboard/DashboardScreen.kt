@@ -462,9 +462,14 @@ private fun TelemetryPreviewCard(metrics: DeviceMetrics) {
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 MetricItem(
-                    label = "REFRESH RATE",
-                    value = "${metrics.refreshRateHz} Hz",
-                    color = CyberCyan
+                    label = "LIVE FPS",
+                    value = "${metrics.currentFps} FPS",
+                    color = when {
+                        metrics.currentFps >= 55 -> CyberCyan
+                        metrics.currentFps >= 40 -> NeonGreen
+                        metrics.currentFps >= 25 -> AmberWarning
+                        else -> NeonRed
+                    }
                 )
                 MetricItem(
                     label = "RAM USAGE",

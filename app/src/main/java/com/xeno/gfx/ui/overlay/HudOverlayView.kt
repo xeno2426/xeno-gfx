@@ -56,6 +56,13 @@ fun HudOverlayView(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
+    val fpsColor = when {
+        metrics.currentFps >= 55 -> CyberCyan
+        metrics.currentFps >= 40 -> NeonGreen
+        metrics.currentFps >= 25 -> AmberWarning
+        else -> NeonRed
+    }
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -81,10 +88,10 @@ fun HudOverlayView(
                         .background(CyberCyan)
                 )
 
-                // Compact summary metrics
+                // Compact summary metrics: Live FPS
                 Text(
-                    text = "${metrics.refreshRateHz}Hz",
-                    color = CyberCyan,
+                    text = "${metrics.currentFps} FPS",
+                    color = fpsColor,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
@@ -192,9 +199,15 @@ fun HudOverlayView(
                     )
 
                     MetricRow(
+                        label = "Live FPS",
+                        value = "${metrics.currentFps} FPS",
+                        valueColor = fpsColor
+                    )
+
+                    MetricRow(
                         label = "Refresh Rate",
                         value = "${metrics.refreshRateHz} Hz",
-                        valueColor = CyberCyan
+                        valueColor = TextMuted
                     )
 
                     MetricRow(

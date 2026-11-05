@@ -13,6 +13,7 @@ class DeviceMetricsTest {
         assertEquals(0L, metrics.ramTotalMb)
         assertEquals(0, metrics.ramPercent)
         assertEquals(60, metrics.refreshRateHz)
+        assertEquals(60, metrics.currentFps)
         assertEquals(DeviceMetrics.ThermalStatus.NORMAL, metrics.thermalStatus)
     }
 

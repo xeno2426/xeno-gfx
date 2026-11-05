@@ -11,6 +11,7 @@ data class DeviceMetrics(
     val batteryTempCelsius: Float = 0.0f,
     val isCharging: Boolean = false,
     val refreshRateHz: Int = 60,
+    val currentFps: Int = 60,
     val networkLatencyMs: Long? = null,
     val thermalStatus: ThermalStatus = ThermalStatus.NORMAL
 ) {

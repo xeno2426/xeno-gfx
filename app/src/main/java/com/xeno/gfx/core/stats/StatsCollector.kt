@@ -39,9 +39,16 @@ class StatsCollector(
     val metrics: StateFlow<DeviceMetrics> = _metrics.asStateFlow()
 
     private var samplingJob: Job? = null
+    private var latestFps: Int = 60
+
+    private val fpsSampler = FpsSampler(maxRefreshRate = 60) { measuredFps ->
+        latestFps = measuredFps
+        _metrics.value = _metrics.value.copy(currentFps = measuredFps)
+    }
 
     fun startSampling(scope: CoroutineScope, intervalMs: Long = 1000L) {
         stopSampling()
+        fpsSampler.start()
         samplingJob = scope.launch(ioDispatcher) {
             while (isActive) {
                 val snapshot = sampleMetrics()
@@ -52,6 +59,7 @@ class StatsCollector(
     }
 
     fun stopSampling() {
+        fpsSampler.stop()
         samplingJob?.cancel()
         samplingJob = null
     }
@@ -63,6 +71,8 @@ class StatsCollector(
         val latency = sampleNetworkLatency()
         val thermalStatus = sampleThermalStatus()
 
+        fpsSampler.setMaxRefreshRate(refreshRate)
+
         DeviceMetrics(
             ramUsedMb = ramUsedMb,
             ramTotalMb = ramTotalMb,
@@ -71,6 +81,7 @@ class StatsCollector(
             batteryTempCelsius = batteryTemp,
             isCharging = isCharging,
             refreshRateHz = refreshRate,
+            currentFps = latestFps,
             networkLatencyMs = latency,
             thermalStatus = thermalStatus
         )
