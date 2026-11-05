@@ -1,0 +1,15 @@
+<resources>
+    <color name="purple_80">#D0BCFF</color>
+    <color name="purple_grey_80">#CCC2DC</color>
+    <color name="pink_80">#EFB8C8</color>
+
+    <color name="purple_40">#6650a4</color>
+    <color name="purple_grey_40">#625b71</color>
+    <color name="pink_40">#7D5260</color>
+
+    <color name="hud_bg">#CC12161A</color>
+    <color name="hud_accent">#00E5FF</color>
+    <color name="hud_accent_green">#00E676</color>
+    <color name="hud_accent_amber">#FFD600</color>
+    <color name="hud_accent_red">#FF1744</color>
+</resources>

@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Xeno GFX</string>
+    <string name="dashboard_title">Xeno GFX Control Center</string>
+    <string name="hud_service_channel_name">HUD Performance Monitor</string>
+    <string name="hud_service_channel_desc">Shows active real-time stats overlay while gaming</string>
+    <string name="hud_notification_title">Xeno GFX Monitor Active</string>
+    <string name="hud_notification_text">Tap to configure or dismiss overlay</string>
+    <string name="btn_stop_hud">Stop Monitor</string>
+    <string name="permission_overlay_title">Display Over Other Apps</string>
+    <string name="permission_overlay_desc">Required to display the floating HUD panel while gaming.</string>
+    <string name="permission_usage_title">Usage Access</string>
+    <string name="permission_usage_desc">Used strictly to detect when your games are launched so the HUD can appear automatically.</string>
+    <string name="permission_grant">Grant Permission</string>
+    <string name="permission_granted">Granted</string>
+    <string name="tracked_games_title">Tracked Games</string>
+    <string name="tracked_games_desc">The HUD will automatically open when any of these games start.</string>
+</resources>

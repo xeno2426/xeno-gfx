@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.XenoGfx" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#12161A</item>
+        <item name="android:navigationBarColor">#12161A</item>
+    </style>
+</resources>
