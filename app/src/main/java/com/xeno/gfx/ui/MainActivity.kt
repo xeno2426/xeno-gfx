@@ -24,7 +24,10 @@ class MainActivity : ComponentActivity() {
                     uiState = uiState,
                     onToggleManualHud = { viewModel.toggleManualHud() },
                     onToggleAutoHud = { enabled -> viewModel.toggleAutoHud(enabled) },
-                    onToggleTrackedGame = { pkg -> viewModel.toggleTrackedGame(pkg) }
+                    onToggleTrackedGame = { pkg -> viewModel.toggleTrackedGame(pkg) },
+                    onManualCleanRam = { viewModel.manualCleanRam() },
+                    onLaunchBgmiWithTurbo = { viewModel.launchBgmiWithTurbo() },
+                    onToggleContinuousSuppression = { enabled -> viewModel.toggleContinuousSuppression(enabled) }
                 )
             }
         }

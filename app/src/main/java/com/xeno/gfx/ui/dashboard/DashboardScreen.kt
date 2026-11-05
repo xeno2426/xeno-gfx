@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
@@ -67,6 +69,9 @@ fun DashboardScreen(
     onToggleManualHud: () -> Unit,
     onToggleAutoHud: (Boolean) -> Unit,
     onToggleTrackedGame: (String) -> Unit,
+    onManualCleanRam: () -> Unit,
+    onLaunchBgmiWithTurbo: () -> Unit,
+    onToggleContinuousSuppression: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -86,6 +91,16 @@ fun DashboardScreen(
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 HeaderSection()
+            }
+
+            // Dedicated BGMI RAM Turbo Card (4GB Optimization)
+            item {
+                BgmiRamTurboCard(
+                    uiState = uiState,
+                    onCleanNow = onManualCleanRam,
+                    onLaunchBgmi = onLaunchBgmiWithTurbo,
+                    onToggleContinuous = onToggleContinuousSuppression
+                )
             }
 
             // Permissions Card (if any missing)
@@ -141,6 +156,163 @@ fun DashboardScreen(
 
             item {
                 Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BgmiRamTurboCard(
+    uiState: DashboardUiState,
+    onCleanNow: () -> Unit,
+    onLaunchBgmi: () -> Unit,
+    onToggleContinuous: (Boolean) -> Unit
+) {
+    val totalRam = uiState.previewMetrics.ramTotalMb
+    val usedRam = uiState.previewMetrics.ramUsedMb
+    val freeRam = (totalRam - usedRam).coerceAtLeast(0L)
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, NeonGreen.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.RocketLaunch,
+                        contentDescription = null,
+                        tint = NeonGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "BGMI 4GB RAM TURBO",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = NeonGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Targeting 3GB RAM headroom for BGMI",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMuted
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurfaceElevated)
+                        .border(1.dp, NeonGreen.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${freeRam}MB FREE",
+                        color = NeonGreen,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Clean Results Feedback (if any)
+            uiState.lastCleanResult?.let { result ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(CyberCyan.copy(alpha = 0.12f))
+                        .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "⚡ Purged ${result.terminatedAppsCount} background apps • Recovered +${result.freedMb}MB RAM",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            // Primary Launch / Clean Action Button
+            Button(
+                onClick = {
+                    if (uiState.isBgmiInstalled) {
+                        onLaunchBgmi()
+                    } else {
+                        onCleanNow()
+                    }
+                },
+                enabled = !uiState.isCleaningInProgress,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NeonGreen,
+                    contentColor = DarkBackground
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Icon(
+                    imageVector = if (uiState.isBgmiInstalled) Icons.Default.RocketLaunch else Icons.Default.CleaningServices,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (uiState.isCleaningInProgress) {
+                        "PURGING BACKGROUND APPS..."
+                    } else if (uiState.isBgmiInstalled) {
+                        "PURGE RAM & LAUNCH BGMI"
+                    } else {
+                        "PURGE BACKGROUND APPS NOW"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            // In-Game Background Killer Switch (every 30s)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "In-Game Background Suppressor",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Auto-kills apps every 30s while in gunfights to eliminate stutter",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                }
+                Switch(
+                    checked = uiState.isContinuousSuppressionEnabled,
+                    onCheckedChange = { onToggleContinuous(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = DarkBackground,
+                        checkedTrackColor = NeonGreen,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = DarkSurfaceElevated
+                    )
+                )
             }
         }
     }

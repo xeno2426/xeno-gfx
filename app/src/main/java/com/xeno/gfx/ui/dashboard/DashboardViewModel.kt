@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.xeno.gfx.core.detector.ForegroundGameDetector
 import com.xeno.gfx.core.model.DeviceMetrics
 import com.xeno.gfx.core.model.TrackedGame
+import com.xeno.gfx.core.optimizer.CleanResult
+import com.xeno.gfx.core.optimizer.RamOptimizer
 import com.xeno.gfx.core.permission.PermissionHelper
 import com.xeno.gfx.core.stats.StatsCollector
 import com.xeno.gfx.service.HudOverlayService
@@ -22,9 +24,13 @@ data class DashboardUiState(
     val hasUsageStatsPermission: Boolean = false,
     val isHudActive: Boolean = false,
     val isAutoHudEnabled: Boolean = false,
+    val isContinuousSuppressionEnabled: Boolean = true,
+    val isCleaningInProgress: Boolean = false,
+    val lastCleanResult: CleanResult? = null,
     val previewMetrics: DeviceMetrics = DeviceMetrics(),
     val installedApps: List<TrackedGame> = emptyList(),
-    val trackedGamePackages: Set<String> = emptySet()
+    val trackedGamePackages: Set<String> = emptySet(),
+    val isBgmiInstalled: Boolean = false
 )
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
@@ -32,6 +38,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val context = application.applicationContext
     private val statsCollector = StatsCollector(context)
     private val gameDetector = ForegroundGameDetector(context)
+    val ramOptimizer = RamOptimizer(context)
+
+    companion object {
+        const val BGMI_PACKAGE_NAME = "com.pubg.imobile"
+    }
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
@@ -45,10 +56,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         // Configure auto-HUD game detection listeners
-        gameDetector.onGameLaunched = { _ ->
+        gameDetector.onGameLaunched = { packageName ->
             if (_uiState.value.isAutoHudEnabled && PermissionHelper.hasOverlayPermission(context)) {
                 HudOverlayService.start(context)
                 _uiState.value = _uiState.value.copy(isHudActive = true)
+            }
+
+            // Automatic RAM purge & suppression when game is launched
+            viewModelScope.launch {
+                val cleanResult = ramOptimizer.purgeMemory(packageName)
+                _uiState.value = _uiState.value.copy(lastCleanResult = cleanResult)
+                if (_uiState.value.isContinuousSuppressionEnabled) {
+                    ramOptimizer.startContinuousSuppression(viewModelScope, packageName)
+                }
             }
         }
 
@@ -57,6 +77,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 HudOverlayService.stop(context)
                 _uiState.value = _uiState.value.copy(isHudActive = false)
             }
+            ramOptimizer.stopContinuousSuppression()
         }
 
         refreshPermissions()
@@ -75,10 +96,56 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun refreshPermissions() {
         val hasOverlay = PermissionHelper.hasOverlayPermission(context)
         val hasUsage = PermissionHelper.hasUsageStatsPermission(context)
+        val isBgmi = isPackageInstalled(BGMI_PACKAGE_NAME)
         _uiState.value = _uiState.value.copy(
             hasOverlayPermission = hasOverlay,
-            hasUsageStatsPermission = hasUsage
+            hasUsageStatsPermission = hasUsage,
+            isBgmiInstalled = isBgmi
         )
+    }
+
+    fun manualCleanRam() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isCleaningInProgress = true)
+            val result = ramOptimizer.purgeMemory(BGMI_PACKAGE_NAME)
+            _uiState.value = _uiState.value.copy(
+                lastCleanResult = result,
+                isCleaningInProgress = false
+            )
+        }
+    }
+
+    fun launchBgmiWithTurbo() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isCleaningInProgress = true)
+            val result = ramOptimizer.purgeMemory(BGMI_PACKAGE_NAME)
+            _uiState.value = _uiState.value.copy(
+                lastCleanResult = result,
+                isCleaningInProgress = false
+            )
+
+            // Start HUD if permission granted
+            if (PermissionHelper.hasOverlayPermission(context)) {
+                HudOverlayService.start(context)
+                _uiState.value = _uiState.value.copy(isHudActive = true)
+            }
+
+            // Start continuous suppression
+            if (_uiState.value.isContinuousSuppressionEnabled) {
+                ramOptimizer.startContinuousSuppression(viewModelScope, BGMI_PACKAGE_NAME)
+            }
+
+            // Launch BGMI
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(BGMI_PACKAGE_NAME)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+            }
+        }
+    }
+
+    fun toggleContinuousSuppression(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isContinuousSuppressionEnabled = enabled)
     }
 
     fun toggleManualHud() {
@@ -142,6 +209,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 trackedGamePackages = games.take(3).map { it.packageName }.toSet()
             )
             gameDetector.setTrackedGames(_uiState.value.trackedGamePackages)
+        }
+    }
+
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            context.packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
         }
     }
 }
