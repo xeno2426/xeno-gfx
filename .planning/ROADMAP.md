@@ -6,7 +6,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Telemetry Consolidation & 30 FPS Meter Calibration** - Consolidate telemetry collection and calibrate frame cadence to an honest 30 FPS baseline
+- [x] **Phase 1: Telemetry Consolidation & 30 FPS Meter Calibration** - Consolidate telemetry collection and calibrate frame cadence to an honest 30 FPS baseline
 - [ ] **Phase 2: Jetpack DataStore Settings Persistence** - Provide transactional persistence for user settings, HUD coordinates, and preferences
 - [ ] **Phase 3: Persistent Foreground Service & Game Session Decoupling** - Decouple session management and aggressive process suppression into a persistent foreground service
 - [ ] **Phase 4: Floating HUD Evolution & Minimalist FPS Badge** - Implement stealth FPS badge, touch-slop dragging, and orientation bounds clamping
@@ -26,7 +26,7 @@
   3. Dashboard and overlay telemetry streams update smoothly from a unified `TelemetryRepository` with CPU overhead measured under 1% on low-end devices.
 **Plans:** 2 plans
 - [x] 01-01-PLAN.md — Core Engine & Pacing Calibration (DeviceMetrics, FpsSampler, Unit Tests)
-- [ ] 01-02-PLAN.md — Telemetry Repository Consolidation, Decoupled Socket Latency Probe & UI Integration (TelemetryRepository, DashboardViewModel, HudOverlayService, DashboardScreen, HudOverlayView)
+- [x] 01-02-PLAN.md — Telemetry Repository Consolidation, Decoupled Socket Latency Probe & UI Integration (TelemetryRepository, DashboardViewModel, HudOverlayService, DashboardScreen, HudOverlayView)
 **UI hint**: yes
 
 ### Phase 2: Jetpack DataStore Settings Persistence
@@ -94,7 +94,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Telemetry Consolidation & 30 FPS Meter Calibration | 1/2 | In progress | - |
+| 1. Telemetry Consolidation & 30 FPS Meter Calibration | 2/2 | Complete | 2026-11-06 |
 | 2. Jetpack DataStore Settings Persistence | 0/0 | Not started | - |
 | 3. Persistent Foreground Service & Game Session Decoupling | 0/0 | Not started | - |
 | 4. Floating HUD Evolution & Minimalist FPS Badge | 0/0 | Not started | - |
