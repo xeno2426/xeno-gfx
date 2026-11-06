@@ -662,11 +662,11 @@ data class DashboardUiState(
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should initial installed launcher games seed `trackedGamePackages` if DataStore is empty?**
+   - *RESOLVED:* Adopted 3-game auto-seed on empty DataStore per `02-02-PLAN.md` Task 1. When `loadInstalledLauncherApps` discovers games, if DataStore's `trackedGamePackages` is empty, seed with `games.take(3).map { it.packageName }.toSet()` and persist it immediately via `settingsRepository.updateTrackedGames`.
    - *What we know:* Currently `DashboardViewModel` seeds `games.take(3).map { it.packageName }.toSet()` if not specified [VERIFIED: app/src/main/java/com/xeno/gfx/ui/dashboard/DashboardViewModel.kt:208].
-   - *What's unclear:* Whether fresh installs should keep this 3-game auto-seed or start with an empty set.
    - *Recommendation:* If DataStore's `trackedGamePackages` is empty on first boot, initialize it with the first 3 detected games so users immediately experience auto-HUD without manual setup, then persist that choice so subsequent modifications stick.
 
 ---
