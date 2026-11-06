@@ -25,7 +25,7 @@
   2. User observes network ping latency updating every 5 seconds without UI stutter, color-coded for instant health assessment (Green <60ms, Yellow 60-120ms, Red >120ms).
   3. Dashboard and overlay telemetry streams update smoothly from a unified `TelemetryRepository` with CPU overhead measured under 1% on low-end devices.
 **Plans:** 2 plans
-- [ ] 01-01-PLAN.md — Core Engine & Pacing Calibration (DeviceMetrics, FpsSampler, Unit Tests)
+- [x] 01-01-PLAN.md — Core Engine & Pacing Calibration (DeviceMetrics, FpsSampler, Unit Tests)
 - [ ] 01-02-PLAN.md — Telemetry Repository Consolidation, Decoupled Socket Latency Probe & UI Integration (TelemetryRepository, DashboardViewModel, HudOverlayService, DashboardScreen, HudOverlayView)
 **UI hint**: yes
 
@@ -94,7 +94,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Telemetry Consolidation & 30 FPS Meter Calibration | 0/2 | Planned | - |
+| 1. Telemetry Consolidation & 30 FPS Meter Calibration | 1/2 | In progress | - |
 | 2. Jetpack DataStore Settings Persistence | 0/0 | Not started | - |
 | 3. Persistent Foreground Service & Game Session Decoupling | 0/0 | Not started | - |
 | 4. Floating HUD Evolution & Minimalist FPS Badge | 0/0 | Not started | - |
