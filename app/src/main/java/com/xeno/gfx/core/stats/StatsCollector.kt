@@ -80,10 +80,10 @@ class StatsCollector(
             batteryLevel = batteryLevel,
             batteryTempCelsius = batteryTemp,
             isCharging = isCharging,
-            refreshRateHz = refreshRate,
-            currentFps = latestFps,
-            networkLatencyMs = latency,
-            thermalStatus = thermalStatus
+            thermalStatus = thermalStatus,
+            calibratedFps = latestFps,
+            rawRefreshRate = refreshRate,
+            latencyMs = latency
         )
     }
 
