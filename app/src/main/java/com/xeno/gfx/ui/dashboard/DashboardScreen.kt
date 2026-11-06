@@ -430,7 +430,7 @@ private fun PermissionRow(
         OutlinedButton(
             onClick = onGrant,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberCyan),
-            border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(CyberCyan))
+            border = androidx.compose.foundation.BorderStroke(1.dp, CyberCyan)
         ) {
             Text("Grant", fontSize = 12.sp)
         }
@@ -462,12 +462,12 @@ private fun TelemetryPreviewCard(metrics: DeviceMetrics) {
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 MetricItem(
-                    label = "LIVE FPS",
-                    value = "${metrics.currentFps} FPS",
+                    label = "30 FPS TARGET",
+                    value = "${metrics.calibratedFps} FPS",
                     color = when {
-                        metrics.currentFps >= 55 -> CyberCyan
-                        metrics.currentFps >= 40 -> NeonGreen
-                        metrics.currentFps >= 25 -> AmberWarning
+                        metrics.calibratedFps >= 28 -> CyberCyan
+                        metrics.calibratedFps >= 24 -> NeonGreen
+                        metrics.calibratedFps >= 18 -> AmberWarning
                         else -> NeonRed
                     }
                 )
@@ -486,12 +486,12 @@ private fun TelemetryPreviewCard(metrics: DeviceMetrics) {
                     }
                 )
                 MetricItem(
-                    label = "LATENCY",
-                    value = metrics.networkLatencyMs?.let { "${it}ms" } ?: "--",
+                    label = "PING (DNS)",
+                    value = metrics.latencyMs?.let { "${it}ms" } ?: "-- ms",
                     color = when {
-                        metrics.networkLatencyMs == null -> TextMuted
-                        metrics.networkLatencyMs < 60 -> NeonGreen
-                        metrics.networkLatencyMs < 120 -> AmberWarning
+                        metrics.latencyMs == null -> TextMuted
+                        metrics.latencyMs < 60 -> NeonGreen
+                        metrics.latencyMs < 120 -> AmberWarning
                         else -> NeonRed
                     }
                 )

@@ -47,6 +47,16 @@ import com.xeno.gfx.ui.theme.NeonGreen
 import com.xeno.gfx.ui.theme.NeonRed
 import com.xeno.gfx.ui.theme.TextMuted
 
+/**
+ * Collapsible floating HUD composable displaying real-time FPS, RAM, thermal status, and ping.
+ *
+ * Implements 01-UI-SPEC design contract:
+ * - Monotonic 4dp/8dp grid spacing with 44dp minimum touch targets for HUD action icons.
+ * - Monospace tabular digits for live numerical telemetry to eliminate frame-rate jitter.
+ * - Semantic 30 FPS thresholds: CyberCyan (>=28), NeonGreen (24..27), AmberWarning (18..23), NeonRed (<18).
+ * - Distinct labeling separating calibrated gaming FPS from physical display compositor refresh rate.
+ * - Decoupled ping display with graceful "-- ms" / "Offline / Timeout" fallback.
+ */
 @Composable
 fun HudOverlayView(
     metrics: DeviceMetrics,
@@ -57,9 +67,16 @@ fun HudOverlayView(
     var isExpanded by remember { mutableStateOf(false) }
 
     val fpsColor = when {
-        metrics.currentFps >= 55 -> CyberCyan
-        metrics.currentFps >= 40 -> NeonGreen
-        metrics.currentFps >= 25 -> AmberWarning
+        metrics.calibratedFps >= 28 -> CyberCyan
+        metrics.calibratedFps >= 24 -> NeonGreen
+        metrics.calibratedFps >= 18 -> AmberWarning
+        else -> NeonRed
+    }
+
+    val latencyColor = when {
+        metrics.latencyMs == null -> TextMuted
+        metrics.latencyMs < 60L -> NeonGreen
+        metrics.latencyMs < 120L -> AmberWarning
         else -> NeonRed
     }
 
@@ -88,9 +105,9 @@ fun HudOverlayView(
                         .background(CyberCyan)
                 )
 
-                // Compact summary metrics: Live FPS
+                // Compact summary metrics: Calibrated 30 FPS target
                 Text(
-                    text = "${metrics.currentFps} FPS",
+                    text = "${metrics.calibratedFps} FPS",
                     color = fpsColor,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
@@ -115,42 +132,46 @@ fun HudOverlayView(
                     )
                 }
 
-                if (metrics.networkLatencyMs != null) {
-                    val latencyColor = when {
-                        metrics.networkLatencyMs < 60 -> NeonGreen
-                        metrics.networkLatencyMs < 120 -> AmberWarning
-                        else -> NeonRed
-                    }
-                    Text(
-                        text = "${metrics.networkLatencyMs}ms",
-                        color = latencyColor,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                // Decoupled Ping indicator
+                Text(
+                    text = metrics.latencyMs?.let { "${it}ms" } ?: "-- ms",
+                    color = latencyColor,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // Expand/Collapse Toggle
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Expand HUD",
-                    tint = TextMuted,
+                // Expand/Collapse Toggle with 44dp minimum ergonomic touch bounds per 01-UI-SPEC § 4
+                Box(
                     modifier = Modifier
-                        .size(18.dp)
-                        .clickable { isExpanded = !isExpanded }
-                )
+                        .size(44.dp)
+                        .clickable { isExpanded = !isExpanded },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expand HUD",
+                        tint = TextMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
-                // Close button
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close HUD",
-                    tint = TextMuted,
+                // Close button with 44dp minimum ergonomic touch bounds per 01-UI-SPEC § 4
+                Box(
                     modifier = Modifier
-                        .size(16.dp)
-                        .clickable { onCloseClick() }
-                )
+                        .size(44.dp)
+                        .clickable { onCloseClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close HUD",
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
             // Expanded Detail Section
@@ -199,26 +220,21 @@ fun HudOverlayView(
                     )
 
                     MetricRow(
-                        label = "Live FPS",
-                        value = "${metrics.currentFps} FPS",
+                        label = "Live Gaming FPS",
+                        value = "${metrics.calibratedFps} FPS (30 FPS Target)",
                         valueColor = fpsColor
                     )
 
                     MetricRow(
-                        label = "Refresh Rate",
-                        value = "${metrics.refreshRateHz} Hz",
+                        label = "Panel Refresh Rate",
+                        value = "${metrics.rawRefreshRate} Hz (Compositor)",
                         valueColor = TextMuted
                     )
 
                     MetricRow(
-                        label = "Ping (8.8.8.8)",
-                        value = metrics.networkLatencyMs?.let { "${it} ms" } ?: "Offline / Timeout",
-                        valueColor = when {
-                            metrics.networkLatencyMs == null -> TextMuted
-                            metrics.networkLatencyMs < 60 -> NeonGreen
-                            metrics.networkLatencyMs < 120 -> AmberWarning
-                            else -> NeonRed
-                        }
+                        label = "Ping (Google DNS)",
+                        value = metrics.latencyMs?.let { "${it} ms" } ?: "Offline / Timeout",
+                        valueColor = latencyColor
                     )
                 }
             }
