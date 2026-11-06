@@ -24,7 +24,9 @@
   1. User observes the FPS counter accurately report a calibrated 30 FPS target (clamped against a 33.33ms VSYNC cadence baseline) instead of misleading 60 FPS panel refresh rates.
   2. User observes network ping latency updating every 5 seconds without UI stutter, color-coded for instant health assessment (Green <60ms, Yellow 60-120ms, Red >120ms).
   3. Dashboard and overlay telemetry streams update smoothly from a unified `TelemetryRepository` with CPU overhead measured under 1% on low-end devices.
-**Plans**: TBD
+**Plans:** 2 plans
+- [ ] 01-01-PLAN.md — Core Engine & Pacing Calibration (DeviceMetrics, FpsSampler, Unit Tests)
+- [ ] 01-02-PLAN.md — Telemetry Repository Consolidation, Decoupled Socket Latency Probe & UI Integration (TelemetryRepository, DashboardViewModel, HudOverlayService, DashboardScreen, HudOverlayView)
 **UI hint**: yes
 
 ### Phase 2: Jetpack DataStore Settings Persistence
@@ -92,7 +94,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Telemetry Consolidation & 30 FPS Meter Calibration | 0/0 | Not started | - |
+| 1. Telemetry Consolidation & 30 FPS Meter Calibration | 0/2 | Planned | - |
 | 2. Jetpack DataStore Settings Persistence | 0/0 | Not started | - |
 | 3. Persistent Foreground Service & Game Session Decoupling | 0/0 | Not started | - |
 | 4. Floating HUD Evolution & Minimalist FPS Badge | 0/0 | Not started | - |
