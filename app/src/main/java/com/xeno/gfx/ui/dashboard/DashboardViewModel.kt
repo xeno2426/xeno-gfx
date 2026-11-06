@@ -11,6 +11,7 @@ import com.xeno.gfx.core.model.TrackedGame
 import com.xeno.gfx.core.optimizer.CleanResult
 import com.xeno.gfx.core.optimizer.RamOptimizer
 import com.xeno.gfx.core.permission.PermissionHelper
+import com.xeno.gfx.core.repository.SettingsRepository
 import com.xeno.gfx.core.repository.TelemetryRepository
 import com.xeno.gfx.service.HudOverlayService
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val context = application.applicationContext
     private val telemetryRepository = TelemetryRepository.getInstance(context)
+    private val settingsRepository = SettingsRepository.getInstance(context)
     private val gameDetector = ForegroundGameDetector(context)
     val ramOptimizer = RamOptimizer(context)
 
@@ -52,6 +54,23 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             telemetryRepository.metrics.collect { metrics ->
                 _uiState.value = _uiState.value.copy(previewMetrics = metrics)
+            }
+        }
+
+        // Collect persistent user settings from SettingsRepository per D-06 & D-10
+        viewModelScope.launch {
+            settingsRepository.userSettings.collect { settings ->
+                _uiState.value = _uiState.value.copy(
+                    isContinuousSuppressionEnabled = settings.isContinuousSuppressionEnabled,
+                    isAutoHudEnabled = settings.isAutoHudEnabled,
+                    trackedGamePackages = settings.trackedGamePackages
+                )
+                gameDetector.setTrackedGames(settings.trackedGamePackages)
+                if (settings.isAutoHudEnabled && PermissionHelper.hasUsageStatsPermission(context)) {
+                    gameDetector.startMonitoring(viewModelScope)
+                } else {
+                    gameDetector.stopMonitoring()
+                }
             }
         }
 
@@ -145,6 +164,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun toggleContinuousSuppression(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isContinuousSuppressionEnabled = enabled)
+        viewModelScope.launch {
+            settingsRepository.setContinuousSuppression(enabled)
+        }
     }
 
     fun toggleManualHud() {
@@ -159,7 +181,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun toggleAutoHud(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isAutoHudEnabled = enabled)
-        if (enabled) {
+        viewModelScope.launch {
+            settingsRepository.setAutoHud(enabled)
+        }
+        if (enabled && PermissionHelper.hasUsageStatsPermission(context)) {
             gameDetector.setTrackedGames(_uiState.value.trackedGamePackages)
             gameDetector.startMonitoring(viewModelScope)
         } else {
@@ -176,6 +201,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
         _uiState.value = _uiState.value.copy(trackedGamePackages = current)
         gameDetector.setTrackedGames(current)
+        viewModelScope.launch {
+            settingsRepository.updateTrackedGames(current)
+        }
     }
 
     private fun loadInstalledLauncherApps() {
@@ -203,11 +231,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 .sortedBy { it.appName.lowercase() }
 
             _uiState.value = _uiState.value.copy(
-                installedApps = games,
-                // Default tracked packages: initial empty or games
-                trackedGamePackages = games.take(3).map { it.packageName }.toSet()
+                installedApps = games
             )
-            gameDetector.setTrackedGames(_uiState.value.trackedGamePackages)
+
+            // If persisted trackedGamePackages in DataStore is empty, seed with first 3 discovered games
+            if (_uiState.value.trackedGamePackages.isEmpty() && games.isNotEmpty()) {
+                val seedPackages = games.take(3).map { it.packageName }.toSet()
+                settingsRepository.updateTrackedGames(seedPackages)
+            }
         }
     }
 

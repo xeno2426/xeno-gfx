@@ -20,6 +20,8 @@ import androidx.core.app.NotificationCompat
 import com.xeno.gfx.R
 import com.xeno.gfx.XenoGfxApp
 import com.xeno.gfx.core.model.HudConfig
+import com.xeno.gfx.core.model.UserSettings
+import com.xeno.gfx.core.repository.SettingsRepository
 import com.xeno.gfx.core.repository.TelemetryRepository
 import com.xeno.gfx.ui.MainActivity
 import com.xeno.gfx.ui.overlay.HudOverlayView
@@ -28,6 +30,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 class HudOverlayService : Service() {
@@ -59,6 +63,7 @@ class HudOverlayService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var windowManager: WindowManager
     private lateinit var telemetryRepository: TelemetryRepository
+    private lateinit var settingsRepository: SettingsRepository
     private val lifecycleOwner = ComposeLifecycleOwner()
 
     private var overlayView: ComposeView? = null
@@ -70,6 +75,7 @@ class HudOverlayService : Service() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         telemetryRepository = TelemetryRepository.getInstance(this)
+        settingsRepository = SettingsRepository.getInstance(this)
         lifecycleOwner.onCreate()
     }
 
@@ -117,19 +123,46 @@ class HudOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 80
-            y = 120
+            x = 20
+            y = 100
         }
         windowLayoutParams = params
+
+        // Restore persisted HUD coordinates asynchronously with display boundary clamping per D-04, D-08, D-09
+        serviceScope.launch {
+            val settings = settingsRepository.userSettings.first()
+            val displayMetrics = resources.displayMetrics
+            val screenWidth = displayMetrics.widthPixels
+            val screenHeight = displayMetrics.heightPixels
+            val hudWidth = overlayView?.width?.takeIf { it > 0 } ?: 120
+            val hudHeight = overlayView?.height?.takeIf { it > 0 } ?: 120
+
+            val (targetX, targetY) = settings.hudCoordinates
+            val clampedX = targetX.coerceIn(0, maxOf(0, screenWidth - hudWidth))
+            val clampedY = targetY.coerceIn(0, maxOf(0, screenHeight - hudHeight))
+
+            windowLayoutParams?.let { p ->
+                if (p.x != clampedX || p.y != clampedY) {
+                    p.x = clampedX
+                    p.y = clampedY
+                    overlayView?.let { view ->
+                        try {
+                            windowManager.updateViewLayout(view, p)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
 
         val composeView = ComposeView(this).apply {
             lifecycleOwner.attachToView(this)
             setContent {
                 val metrics by telemetryRepository.metrics.collectAsState()
+                val settings by settingsRepository.userSettings.collectAsState(initial = UserSettings())
                 XenoGfxTheme {
                     HudOverlayView(
                         metrics = metrics,
-                        config = HudConfig(),
+                        config = HudConfig(isCompactMode = settings.isCompactHudMode),
                         onCloseClick = { stopSelf() }
                     )
                 }
@@ -165,6 +198,26 @@ class HudOverlayService : Service() {
                     val movedDistance = abs(event.rawX - touchX) + abs(event.rawY - touchY)
                     if (movedDistance < 10) {
                         composeView.performClick()
+                    }
+
+                    // Dynamically clamp release coordinates against physical screen boundaries per D-09
+                    val displayMetrics = resources.displayMetrics
+                    val screenWidth = displayMetrics.widthPixels
+                    val screenHeight = displayMetrics.heightPixels
+                    val hudWidth = composeView.width.coerceAtLeast(100)
+                    val hudHeight = composeView.height.coerceAtLeast(100)
+                    val clampedX = p.x.coerceIn(0, maxOf(0, screenWidth - hudWidth))
+                    val clampedY = p.y.coerceIn(0, maxOf(0, screenHeight - hudHeight))
+
+                    if (p.x != clampedX || p.y != clampedY) {
+                        p.x = clampedX
+                        p.y = clampedY
+                        windowManager.updateViewLayout(composeView, p)
+                    }
+
+                    // Asynchronously commit clamped coordinates to DataStore per D-03 and D-08
+                    serviceScope.launch(Dispatchers.IO) {
+                        settingsRepository.saveHudCoordinates(clampedX, clampedY)
                     }
                     true
                 }
