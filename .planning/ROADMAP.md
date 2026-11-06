@@ -38,7 +38,9 @@
   1. User-configured settings (tracked game package selections, custom whitelists, turbo toggles, and HUD preferences) are immediately retained after force-stopping and reopening the application.
   2. Floating HUD on-screen coordinates and display mode state survive device reboots without reverting to default presets.
   3. Preference reads and writes occur asynchronously via Jetpack DataStore without causing main-thread frame drops or UI hiccups.
-**Plans**: TBD
+**Plans:** 2 plans
+- [ ] 02-01-PLAN.md — Jetpack Preferences DataStore Foundation, UserSettings Model & SettingsRepository
+- [ ] 02-02-PLAN.md — Presentation & Service DataStore Integration (DashboardViewModel & HudOverlayService)
 **UI hint**: yes
 
 ### Phase 3: Persistent Foreground Service & Game Session Decoupling
