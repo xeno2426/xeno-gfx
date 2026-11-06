@@ -20,7 +20,7 @@ import androidx.core.app.NotificationCompat
 import com.xeno.gfx.R
 import com.xeno.gfx.XenoGfxApp
 import com.xeno.gfx.core.model.HudConfig
-import com.xeno.gfx.core.stats.StatsCollector
+import com.xeno.gfx.core.repository.TelemetryRepository
 import com.xeno.gfx.ui.MainActivity
 import com.xeno.gfx.ui.overlay.HudOverlayView
 import com.xeno.gfx.ui.theme.XenoGfxTheme
@@ -58,7 +58,7 @@ class HudOverlayService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var windowManager: WindowManager
-    private lateinit var statsCollector: StatsCollector
+    private lateinit var telemetryRepository: TelemetryRepository
     private val lifecycleOwner = ComposeLifecycleOwner()
 
     private var overlayView: ComposeView? = null
@@ -69,7 +69,7 @@ class HudOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        statsCollector = StatsCollector(this)
+        telemetryRepository = TelemetryRepository.getInstance(this)
         lifecycleOwner.onCreate()
     }
 
@@ -82,7 +82,6 @@ class HudOverlayService : Service() {
             else -> {
                 startForeground(NOTIFICATION_ID, buildNotification())
                 showOverlay()
-                statsCollector.startSampling(serviceScope, 1000L)
                 lifecycleOwner.onResume()
             }
         }
@@ -92,7 +91,6 @@ class HudOverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         hideOverlay()
-        statsCollector.stopSampling()
         lifecycleOwner.onPause()
         lifecycleOwner.onDestroy()
         serviceScope.cancel()
@@ -127,7 +125,7 @@ class HudOverlayService : Service() {
         val composeView = ComposeView(this).apply {
             lifecycleOwner.attachToView(this)
             setContent {
-                val metrics by statsCollector.metrics.collectAsState()
+                val metrics by telemetryRepository.metrics.collectAsState()
                 XenoGfxTheme {
                     HudOverlayView(
                         metrics = metrics,

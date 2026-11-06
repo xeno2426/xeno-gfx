@@ -27,6 +27,7 @@ import java.net.Socket
 /**
  * Periodically samples device hardware metrics and network latency.
  */
+@Deprecated("Replaced by TelemetryRepository to eliminate dual polling instances per D-04")
 class StatsCollector(
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO

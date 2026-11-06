@@ -11,7 +11,7 @@ import com.xeno.gfx.core.model.TrackedGame
 import com.xeno.gfx.core.optimizer.CleanResult
 import com.xeno.gfx.core.optimizer.RamOptimizer
 import com.xeno.gfx.core.permission.PermissionHelper
-import com.xeno.gfx.core.stats.StatsCollector
+import com.xeno.gfx.core.repository.TelemetryRepository
 import com.xeno.gfx.service.HudOverlayService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +36,7 @@ data class DashboardUiState(
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
-    private val statsCollector = StatsCollector(context)
+    private val telemetryRepository = TelemetryRepository.getInstance(context)
     private val gameDetector = ForegroundGameDetector(context)
     val ramOptimizer = RamOptimizer(context)
 
@@ -48,9 +48,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
-        // Collect live preview metrics
+        // Collect live preview metrics from demand-driven TelemetryRepository per D-04 & D-05
         viewModelScope.launch {
-            statsCollector.metrics.collect { metrics ->
+            telemetryRepository.metrics.collect { metrics ->
                 _uiState.value = _uiState.value.copy(previewMetrics = metrics)
             }
         }
@@ -86,11 +86,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun onResume() {
         refreshPermissions()
-        statsCollector.startSampling(viewModelScope, 1000L)
     }
 
     fun onPause() {
-        statsCollector.stopSampling()
+        // Telemetry sampling automatically pauses via WhileSubscribed(5000L) per D-05
     }
 
     fun refreshPermissions() {
