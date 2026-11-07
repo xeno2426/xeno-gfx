@@ -120,7 +120,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val needsSaf = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !uiState.hasSafPermission
+    val needsStorage = !uiState.hasSafPermission
     var selectedTab by remember { mutableStateOf(DashboardTab.DASHBOARD) }
 
     Scaffold(
@@ -167,7 +167,8 @@ fun DashboardScreen(
                     TurboHeroSection(
                         uiState = uiState,
                         onCleanNow = onManualCleanRam,
-                        onLaunchBgmi = onLaunchBgmiWithTurbo
+                        onLaunchBgmi = onLaunchBgmiWithTurbo,
+                        onRequestStorage = onRequestSafPermission
                     )
                 }
             }
@@ -195,12 +196,12 @@ fun DashboardScreen(
             }
 
             // 7. Permissions Action Card (if any pending)
-            if (!uiState.hasOverlayPermission || !uiState.hasUsageStatsPermission || needsSaf) {
+            if (!uiState.hasOverlayPermission || !uiState.hasUsageStatsPermission || needsStorage) {
                 item {
                     PermissionCard(
                         hasOverlay = uiState.hasOverlayPermission,
                         hasUsageStats = uiState.hasUsageStatsPermission,
-                        needsSaf = needsSaf,
+                        needsSaf = needsStorage,
                         context = context,
                         onRequestSaf = onRequestSafPermission
                     )
@@ -392,7 +393,8 @@ private fun HardwareStatusStrip() {
 private fun TurboHeroSection(
     uiState: DashboardUiState,
     onCleanNow: () -> Unit,
-    onLaunchBgmi: () -> Unit
+    onLaunchBgmi: () -> Unit,
+    onRequestStorage: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -454,7 +456,11 @@ private fun TurboHeroSection(
             Button(
                 onClick = {
                     if (uiState.isBgmiInstalled) {
-                        onLaunchBgmi()
+                        if (!uiState.hasSafPermission) {
+                            onRequestStorage()
+                        } else {
+                            onLaunchBgmi()
+                        }
                     } else {
                         onCleanNow()
                     }
@@ -909,7 +915,12 @@ private fun GfxPresetSelectorCard(
 
             // Action row
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !hasSaf) {
+                if (!hasSaf) {
+                    val grantLabel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        "Grant SAF Folder"
+                    } else {
+                        "Grant Storage Access"
+                    }
                     Button(
                         onClick = onRequestSaf,
                         colors = ButtonDefaults.buttonColors(containerColor = ElectricAmber, contentColor = DarkBackground),
@@ -918,12 +929,18 @@ private fun GfxPresetSelectorCard(
                     ) {
                         Icon(imageVector = Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Grant Storage Access", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(grantLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 OutlinedButton(
-                    onClick = onApplyGfx,
+                    onClick = {
+                        if (!hasSaf) {
+                            onRequestSaf()
+                        } else {
+                            onApplyGfx()
+                        }
+                    },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberCyan),
                     border = androidx.compose.foundation.BorderStroke(1.dp, CyberCyan),
                     shape = RoundedCornerShape(8.dp),
@@ -1228,8 +1245,13 @@ private fun PermissionCard(
             }
 
             if (needsSaf) {
+                val storageLabel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    "Storage Access (SAF Android 11+)"
+                } else {
+                    "Storage Permission (Write Storage)"
+                }
                 PermissionMiniRow(
-                    title = "Storage Access (Android 11+)",
+                    title = storageLabel,
                     onGrant = onRequestSaf
                 )
             }

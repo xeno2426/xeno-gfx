@@ -17,6 +17,12 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: DashboardViewModel by viewModels()
 
+    private val legacyStorageLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        viewModel.refreshPermissions()
+    }
+
     private val safLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             viewModel.onSafUriGranted(uri)
@@ -38,11 +44,15 @@ class MainActivity : ComponentActivity() {
                     onLaunchBgmiWithTurbo = { viewModel.launchBgmiWithTurbo() },
                     onToggleContinuousSuppression = { enabled -> viewModel.toggleContinuousSuppression(enabled) },
                     onRequestSafPermission = {
-                        val initialUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            val intent = GfxFileManager.createScopedStorageIntent()
-                            intent.getParcelableExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI)
-                        } else null
-                        safLauncher.launch(initialUri)
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                            legacyStorageLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else {
+                            val initialUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val intent = GfxFileManager.createScopedStorageIntent()
+                                intent.getParcelableExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI)
+                            } else null
+                            safLauncher.launch(initialUri)
+                        }
                     },
                     onSelectPreset = { preset -> viewModel.selectPreset(preset) },
                     onApplyGfxOnly = { viewModel.applyGfxOnly() },
