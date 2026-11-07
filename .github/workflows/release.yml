@@ -51,16 +51,16 @@ jobs:
           tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           name: Xeno GFX ${{ github.event.inputs.tag_name || github.ref_name }}
           body: |
-            ## Xeno GFX v1.1.0 — Cyberpunk Tactical Gaming Optimizer
+            ## Xeno GFX ${{ github.event.inputs.tag_name || github.ref_name }} — Titanium Telemetry Studio & Storage Access Engine
 
             ### 🚀 What's New in this Release:
-            - **Stitch Cyberpunk Tactical UI**: Void Obsidian glassmorphism design, real-time 4-pill diagnostic HUD (FPS, RAM, Temp, Ping), and 4-tab tactical navigation (`DASHBOARD`, `PRESETS`, `TELEMETRY`, `GAMES`).
-            - **BGMI UE4 CVar XOR Codec (`0x79`)**: Reverse-engineered native `UserCustom.ini` hex encoder/decoder with custom graphic presets (Potato Zero-Lag 30 FPS, Smooth 60 FPS, Balanced 40 FPS, Competitive 90 FPS).
-            - **GVAS Active.sav Binary Patcher**: Real-time binary patcher for UE4 save games unlocking FPS targets (`BattleFPS`, `FPSLevel`, `LobbyFPS`) without manual file hex editing.
-            - **Scoped Storage SAF Bridge**: Full Android 11+ Storage Access Framework (`DocumentFile`) integration for accessing `Android/data/com.pubg.imobile/`.
-            - **Gaming Session Tracker**: Records session duration, average FPS, min/max frame rates, stutter frequency (<27 FPS), and peak hardware temperatures.
-            - **Aggressive RAM Turbo & Background Suppressor**: Evicts cached background hogs and suppresses waking processes every 30s during active gaming sessions.
-            - **Floating Overlay HUD**: Low-overhead (<1% CPU) floating window with live telemetry and touch physics.
+            - **Titanium Telemetry Studio UI**: Redesigned from the ground up using Stitch. Frosted smoked glassmorphism, brushed titanium satin tactile surfaces, and a hardware-calibrated luxury palette (Obsidian, Titanium, Champagne Gold, Platinum Ice, Muted Emerald, Sapphire Mist, Subdued Amber) completely eliminating harsh neon colors.
+            - **Storage Permission & EACCES Resolution**: Fixed UE4 config write permission denied errors (`open failed: EACCES`) with dual-path storage access supporting legacy storage permissions (`READ/WRITE/MANAGE_EXTERNAL_STORAGE`) on Android 8–10 and direct DocumentsProvider tree URI resolution on Android 11–15.
+            - **Micro Telemetry Grid & Zero-Jitter Display**: Real-time render pacing (calibrated FPS), LPDDR5X free memory pools, cryo SoC thermals, and carrier latency with tabular monospace digits.
+            - **BGMI UE4 CVar XOR Codec (0x79) & GVAS Active.sav Patcher**: Custom graphic presets (Potato Zero-Lag 30 FPS, Smooth 60 FPS, Balanced 40 FPS, Competitive 90 FPS) with automated UE4 save-game binary patching (`BattleFPS`, `FPSLevel`, `LobbyFPS`).
+            - **One-Tap Turbo Launch Pipeline**: Aggressive RAM purge, instant UE4 configuration injection, persistent background process suppression, and game launch.
+            - **Gaming Session Diagnostics**: Post-session analytics dialog with duration, average FPS, frame range, frame drop stutters, peak temperatures, and reclaimed memory.
+            - **Low-Overhead Floating HUD**: Real-time in-game floating overlay with touch physics consuming <1% CPU.
 
             *Standalone APK assets attached below.*
           files: |
