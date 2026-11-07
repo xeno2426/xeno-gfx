@@ -38,23 +38,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xeno.gfx.core.model.DeviceMetrics
 import com.xeno.gfx.core.model.HudConfig
-import com.xeno.gfx.ui.theme.AmberWarning
-import com.xeno.gfx.ui.theme.CyberCyan
+import com.xeno.gfx.ui.theme.ChampagneGold
 import com.xeno.gfx.ui.theme.HudBorderColor
 import com.xeno.gfx.ui.theme.HudCardBackground
 import com.xeno.gfx.ui.theme.HudPillBackground
-import com.xeno.gfx.ui.theme.NeonGreen
-import com.xeno.gfx.ui.theme.NeonRed
+import com.xeno.gfx.ui.theme.MutedCrimson
+import com.xeno.gfx.ui.theme.MutedEmerald
+import com.xeno.gfx.ui.theme.PlatinumIce
+import com.xeno.gfx.ui.theme.SapphireMist
+import com.xeno.gfx.ui.theme.SubduedAmber
 import com.xeno.gfx.ui.theme.TextMuted
+import com.xeno.gfx.ui.theme.TextVariant
 
 /**
  * Collapsible floating HUD composable displaying real-time FPS, RAM, thermal status, and ping.
  *
- * Implements 01-UI-SPEC design contract:
+ * Implements Stitch Titanium Telemetry Studio Design System:
  * - Monotonic 4dp/8dp grid spacing with 44dp minimum touch targets for HUD action icons.
  * - Monospace tabular digits for live numerical telemetry to eliminate frame-rate jitter.
- * - Semantic 30 FPS thresholds: CyberCyan (>=28), NeonGreen (24..27), AmberWarning (18..23), NeonRed (<18).
- * - Distinct labeling separating calibrated gaming FPS from physical display compositor refresh rate.
+ * - Non-neon luxury palette: MutedEmerald (>=28 FPS), ChampagneGold (24..27), SubduedAmber (18..23), MutedCrimson (<18).
+ * - Frosted smoked glass substrate with hairline specular highlights.
  * - Decoupled ping display with graceful "-- ms" / "Offline / Timeout" fallback.
  */
 @Composable
@@ -67,17 +70,17 @@ fun HudOverlayView(
     var isExpanded by remember { mutableStateOf(false) }
 
     val fpsColor = when {
-        metrics.calibratedFps >= 28 -> CyberCyan
-        metrics.calibratedFps >= 24 -> NeonGreen
-        metrics.calibratedFps >= 18 -> AmberWarning
-        else -> NeonRed
+        metrics.calibratedFps >= 28 -> MutedEmerald
+        metrics.calibratedFps >= 24 -> ChampagneGold
+        metrics.calibratedFps >= 18 -> SubduedAmber
+        else -> MutedCrimson
     }
 
     val latencyColor = when {
         metrics.latencyMs == null -> TextMuted
-        metrics.latencyMs < 60L -> NeonGreen
-        metrics.latencyMs < 120L -> AmberWarning
-        else -> NeonRed
+        metrics.latencyMs < 60L -> MutedEmerald
+        metrics.latencyMs < 120L -> SubduedAmber
+        else -> MutedCrimson
     }
 
     Box(
@@ -102,7 +105,7 @@ fun HudOverlayView(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(CyberCyan)
+                        .background(MutedEmerald)
                 )
 
                 // Compact summary metrics: Calibrated 30 FPS target
@@ -116,7 +119,7 @@ fun HudOverlayView(
 
                 Text(
                     text = "${metrics.ramPercent}%",
-                    color = if (metrics.ramPercent > 80) AmberWarning else NeonGreen,
+                    color = if (metrics.ramPercent > 80) SubduedAmber else PlatinumIce,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
@@ -125,7 +128,7 @@ fun HudOverlayView(
                 if (metrics.batteryTempCelsius > 0) {
                     Text(
                         text = "%.1f°C".format(metrics.batteryTempCelsius),
-                        color = if (metrics.batteryTempCelsius > 42) NeonRed else TextMuted,
+                        color = if (metrics.batteryTempCelsius > 42) MutedCrimson else TextVariant,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
@@ -143,7 +146,7 @@ fun HudOverlayView(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // Expand/Collapse Toggle with 44dp minimum ergonomic touch bounds per 01-UI-SPEC § 4
+                // Expand/Collapse Toggle with 44dp minimum ergonomic touch bounds
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -158,7 +161,7 @@ fun HudOverlayView(
                     )
                 }
 
-                // Close button with 44dp minimum ergonomic touch bounds per 01-UI-SPEC § 4
+                // Close button with 44dp minimum ergonomic touch bounds
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -189,22 +192,22 @@ fun HudOverlayView(
                     MetricRow(
                         label = "RAM Usage",
                         value = "${metrics.ramUsedMb}MB / ${metrics.ramTotalMb}MB (${metrics.ramPercent}%)",
-                        valueColor = if (metrics.ramPercent > 85) NeonRed else NeonGreen
+                        valueColor = if (metrics.ramPercent > 85) MutedCrimson else PlatinumIce
                     )
 
                     MetricRow(
                         label = "Battery",
                         value = "${metrics.batteryLevel}%" + if (metrics.isCharging) " (⚡)" else "",
-                        valueColor = if (metrics.batteryLevel < 20) AmberWarning else CyberCyan
+                        valueColor = if (metrics.batteryLevel < 20) SubduedAmber else ChampagneGold
                     )
 
                     MetricRow(
                         label = "Battery Temp",
                         value = "%.1f °C".format(metrics.batteryTempCelsius),
                         valueColor = when {
-                            metrics.batteryTempCelsius > 42 -> NeonRed
-                            metrics.batteryTempCelsius > 38 -> AmberWarning
-                            else -> NeonGreen
+                            metrics.batteryTempCelsius > 42 -> MutedCrimson
+                            metrics.batteryTempCelsius > 38 -> SubduedAmber
+                            else -> MutedEmerald
                         }
                     )
 
@@ -212,10 +215,10 @@ fun HudOverlayView(
                         label = "Thermal Status",
                         value = metrics.thermalStatus.name,
                         valueColor = when (metrics.thermalStatus) {
-                            DeviceMetrics.ThermalStatus.NORMAL -> NeonGreen
+                            DeviceMetrics.ThermalStatus.NORMAL -> MutedEmerald
                             DeviceMetrics.ThermalStatus.LIGHT,
-                            DeviceMetrics.ThermalStatus.MODERATE -> AmberWarning
-                            else -> NeonRed
+                            DeviceMetrics.ThermalStatus.MODERATE -> SubduedAmber
+                            else -> MutedCrimson
                         }
                     )
 
