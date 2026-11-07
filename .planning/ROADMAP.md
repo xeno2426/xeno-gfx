@@ -7,7 +7,7 @@
 ## Phases
 
 - [x] **Phase 1: Telemetry Consolidation & 30 FPS Meter Calibration** - Consolidate telemetry collection and calibrate frame cadence to an honest 30 FPS baseline
-- [ ] **Phase 2: Jetpack DataStore Settings Persistence** - Provide transactional persistence for user settings, HUD coordinates, and preferences
+- [x] **Phase 2: Jetpack DataStore Settings Persistence** - Provide transactional persistence for user settings, HUD coordinates, and preferences
 - [ ] **Phase 3: Persistent Foreground Service & Game Session Decoupling** - Decouple session management and aggressive process suppression into a persistent foreground service
 - [ ] **Phase 4: Floating HUD Evolution & Minimalist FPS Badge** - Implement stealth FPS badge, touch-slop dragging, and orientation bounds clamping
 - [ ] **Phase 5: BGMI 30 FPS GFX Config Engine** - Build SAF storage bridge with atomic backup and optimized 30 FPS potato graphics presets
@@ -39,8 +39,8 @@
   2. Floating HUD on-screen coordinates and display mode state survive device reboots without reverting to default presets.
   3. Preference reads and writes occur asynchronously via Jetpack DataStore without causing main-thread frame drops or UI hiccups.
 **Plans:** 2 plans
-- [ ] 02-01-PLAN.md — Jetpack Preferences DataStore Foundation, UserSettings Model & SettingsRepository
-- [ ] 02-02-PLAN.md — Presentation & Service DataStore Integration (DashboardViewModel & HudOverlayService)
+- [x] 02-01-PLAN.md — Jetpack Preferences DataStore Foundation, UserSettings Model & SettingsRepository
+- [x] 02-02-PLAN.md — Presentation & Service DataStore Integration (DashboardViewModel & HudOverlayService)
 **UI hint**: yes
 
 ### Phase 3: Persistent Foreground Service & Game Session Decoupling
@@ -97,7 +97,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Telemetry Consolidation & 30 FPS Meter Calibration | 2/2 | Complete | 2026-11-06 |
-| 2. Jetpack DataStore Settings Persistence | 0/0 | Not started | - |
+| 2. Jetpack DataStore Settings Persistence | 2/2 | Complete | 2026-11-06 |
 | 3. Persistent Foreground Service & Game Session Decoupling | 0/0 | Not started | - |
 | 4. Floating HUD Evolution & Minimalist FPS Badge | 0/0 | Not started | - |
 | 5. BGMI 30 FPS GFX Config Engine | 0/0 | Not started | - |
