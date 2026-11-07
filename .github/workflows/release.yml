@@ -51,15 +51,18 @@ jobs:
           tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           name: Xeno GFX ${{ github.event.inputs.tag_name || github.ref_name }}
           body: |
-            ## Xeno GFX — Gaming Performance Toolkit
+            ## Xeno GFX v1.1.0 — Cyberpunk Tactical Gaming Optimizer
 
-            ### Included Features:
-            - **BGMI 4GB RAM Turbo**: Evicts cached apps to maximize available memory for BGMI.
-            - **In-Game Background Suppressor**: Automatically suppresses waking background processes every 30s while gaming.
-            - **Floating Compose HUD**: Real-time RAM, battery temperature, refresh rate, and ping.
-            - **Auto Game Detector**: Automatic overlay trigger upon game launch.
+            ### 🚀 What's New in this Release:
+            - **Stitch Cyberpunk Tactical UI**: Void Obsidian glassmorphism design, real-time 4-pill diagnostic HUD (FPS, RAM, Temp, Ping), and 4-tab tactical navigation (`DASHBOARD`, `PRESETS`, `TELEMETRY`, `GAMES`).
+            - **BGMI UE4 CVar XOR Codec (`0x79`)**: Reverse-engineered native `UserCustom.ini` hex encoder/decoder with custom graphic presets (Potato Zero-Lag 30 FPS, Smooth 60 FPS, Balanced 40 FPS, Competitive 90 FPS).
+            - **GVAS Active.sav Binary Patcher**: Real-time binary patcher for UE4 save games unlocking FPS targets (`BattleFPS`, `FPSLevel`, `LobbyFPS`) without manual file hex editing.
+            - **Scoped Storage SAF Bridge**: Full Android 11+ Storage Access Framework (`DocumentFile`) integration for accessing `Android/data/com.pubg.imobile/`.
+            - **Gaming Session Tracker**: Records session duration, average FPS, min/max frame rates, stutter frequency (<27 FPS), and peak hardware temperatures.
+            - **Aggressive RAM Turbo & Background Suppressor**: Evicts cached background hogs and suppresses waking processes every 30s during active gaming sessions.
+            - **Floating Overlay HUD**: Low-overhead (<1% CPU) floating window with live telemetry and touch physics.
 
-            *Standalone APK asset attached below.*
+            *Standalone APK assets attached below.*
           files: |
             release-assets/xenp-gfx.apk
             release-assets/xeno-gfx.apk
