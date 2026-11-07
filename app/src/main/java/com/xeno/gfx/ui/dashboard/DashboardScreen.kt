@@ -1,6 +1,7 @@
 package com.xeno.gfx.ui.dashboard
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,12 +23,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,6 +39,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -51,8 +56,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xeno.gfx.core.gfx.GfxConfig
 import com.xeno.gfx.core.model.DeviceMetrics
 import com.xeno.gfx.core.permission.PermissionHelper
+import com.xeno.gfx.core.stats.GameSessionStats
 import com.xeno.gfx.ui.theme.AmberWarning
 import com.xeno.gfx.ui.theme.CyberCyan
 import com.xeno.gfx.ui.theme.DarkBackground
@@ -72,9 +79,14 @@ fun DashboardScreen(
     onManualCleanRam: () -> Unit,
     onLaunchBgmiWithTurbo: () -> Unit,
     onToggleContinuousSuppression: (Boolean) -> Unit,
+    onRequestSafPermission: () -> Unit,
+    onSelectPreset: (GfxConfig) -> Unit,
+    onApplyGfxOnly: () -> Unit,
+    onDismissSessionSummary: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val needsSaf = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !uiState.hasSafPermission
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -93,7 +105,17 @@ fun DashboardScreen(
                 HeaderSection()
             }
 
-            // Dedicated BGMI RAM Turbo Card (4GB Optimization)
+            // Session Summary Card (if session just ended)
+            uiState.lastCompletedSession?.let { session ->
+                item {
+                    SessionSummaryCard(
+                        session = session,
+                        onDismiss = onDismissSessionSummary
+                    )
+                }
+            }
+
+            // Dedicated BGMI RAM Turbo & Launch Card
             item {
                 BgmiRamTurboCard(
                     uiState = uiState,
@@ -103,13 +125,28 @@ fun DashboardScreen(
                 )
             }
 
+            // GFX Presets & Graphic Engine Card
+            item {
+                GfxPresetSelectorCard(
+                    selectedConfig = uiState.selectedGfxConfig,
+                    availablePresets = uiState.availablePresets,
+                    onSelectPreset = onSelectPreset,
+                    onApplyGfx = onApplyGfxOnly,
+                    hasSaf = uiState.hasSafPermission,
+                    onRequestSaf = onRequestSafPermission,
+                    applyResult = uiState.gfxApplyResult
+                )
+            }
+
             // Permissions Card (if any missing)
-            if (!uiState.hasOverlayPermission || !uiState.hasUsageStatsPermission) {
+            if (!uiState.hasOverlayPermission || !uiState.hasUsageStatsPermission || needsSaf) {
                 item {
                     PermissionCard(
                         hasOverlay = uiState.hasOverlayPermission,
                         hasUsageStats = uiState.hasUsageStatsPermission,
-                        context = context
+                        needsSaf = needsSaf,
+                        context = context,
+                        onRequestSaf = onRequestSafPermission
                     )
                 }
             }
@@ -159,6 +196,305 @@ fun DashboardScreen(
             }
         }
     }
+}
+
+@Composable
+private fun GfxPresetSelectorCard(
+    selectedConfig: GfxConfig,
+    availablePresets: List<GfxConfig>,
+    onSelectPreset: (GfxConfig) -> Unit,
+    onApplyGfx: () -> Unit,
+    hasSaf: Boolean,
+    onRequestSaf: () -> Unit,
+    applyResult: com.xeno.gfx.core.gfx.ApplyResult?
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = CyberCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "BGMI GRAPHIC CONFIG",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = CyberCyan,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (hasSaf) NeonGreen.copy(alpha = 0.15f) else AmberWarning.copy(alpha = 0.15f))
+                            .border(1.dp, if (hasSaf) NeonGreen else AmberWarning, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (hasSaf) "SAF OK" else "SAF NEEDED",
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasSaf) NeonGreen else AmberWarning
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Hardware-tuned Unreal Engine 4 CVars with 0x79 encryption & Active.sav FPS unlock.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted
+            )
+
+            // Preset Chips Grid
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                availablePresets.chunked(2).forEach { rowPresets ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowPresets.forEach { preset ->
+                            val isSelected = preset.presetName == selectedConfig.presetName
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) CyberCyan.copy(alpha = 0.18f) else DarkSurfaceElevated)
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) CyberCyan else HudBorderColor,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { onSelectPreset(preset) }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                Column {
+                                    Text(
+                                        text = preset.presetName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) CyberCyan else Color.White
+                                    )
+                                    Text(
+                                        text = "${preset.fpsTarget.displayName} • ${preset.resolutionScale.displayName}",
+                                        fontSize = 10.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Selected Preset Spec Specs
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(DarkSurfaceElevated)
+                    .padding(8.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "ACTIVE PRESET PARAMETERS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberCyan,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Graphics: ${selectedConfig.graphicQuality.displayName}",
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Target: ${selectedConfig.fpsTarget.targetFps} FPS",
+                            fontSize = 11.sp,
+                            color = NeonGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "API: ${if (selectedConfig.graphicsApi == com.xeno.gfx.core.gfx.GraphicsApi.OPENGL_ES) "OpenGL" else "Vulkan"}",
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Shadows: ${if (selectedConfig.shadowsEnabled) "ON" else "OFF"}",
+                            fontSize = 11.sp,
+                            color = if (selectedConfig.shadowsEnabled) AmberWarning else TextMuted
+                        )
+                        Text(
+                            text = "MSAA: ${if (selectedConfig.antiAliasingEnabled) "ON" else "OFF"}",
+                            fontSize = 11.sp,
+                            color = if (selectedConfig.antiAliasingEnabled) CyberCyan else TextMuted
+                        )
+                        Text(
+                            text = "Audio: ${selectedConfig.soundQuality.displayName.substringBefore(" ")}",
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
+            // Feedback Message
+            applyResult?.let { res ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (res.isSuccess) NeonGreen.copy(alpha = 0.12f) else NeonRed.copy(alpha = 0.12f))
+                        .border(
+                            1.dp,
+                            if (res.isSuccess) NeonGreen.copy(alpha = 0.4f) else NeonRed.copy(alpha = 0.4f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = res.message,
+                        color = if (res.isSuccess) NeonGreen else NeonRed,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            // Action Row: Apply GFX & SAF Grant
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !hasSaf) {
+                    Button(
+                        onClick = onRequestSaf,
+                        colors = ButtonDefaults.buttonColors(containerColor = AmberWarning, contentColor = DarkBackground),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(imageVector = Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Grant Storage Access", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onApplyGfx,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberCyan),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberCyan),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Apply GFX Only", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionSummaryCard(
+    session: GameSessionStats,
+    onDismiss: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CyberCyan, RoundedCornerShape(16.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = null,
+                        tint = CyberCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "LAST SESSION REPORT",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = CyberCyan,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextMuted)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                MetricItem(
+                    label = "DURATION",
+                    value = formatDuration(session.durationSeconds),
+                    color = Color.White
+                )
+                MetricItem(
+                    label = "AVG FPS",
+                    value = "%.1f".format(session.averageFps),
+                    color = if (session.averageFps >= 28f) CyberCyan else NeonGreen
+                )
+                MetricItem(
+                    label = "PEAK TEMP",
+                    value = "%.1f°C".format(session.peakTempCelsius),
+                    color = if (session.peakTempCelsius > 42f) NeonRed else NeonGreen
+                )
+                MetricItem(
+                    label = "STUTTERS",
+                    value = "${session.stutterCount}",
+                    color = if (session.stutterCount == 0) NeonGreen else AmberWarning
+                )
+            }
+        }
+    }
+}
+
+private fun formatDuration(seconds: Long): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return "${m}m ${s}s"
 }
 
 @Composable
@@ -276,7 +612,7 @@ private fun BgmiRamTurboCard(
                     text = if (uiState.isCleaningInProgress) {
                         "PURGING BACKGROUND APPS..."
                     } else if (uiState.isBgmiInstalled) {
-                        "PURGE RAM & LAUNCH BGMI"
+                        "TURBO LAUNCH BGMI"
                     } else {
                         "PURGE BACKGROUND APPS NOW"
                     },
@@ -360,7 +696,9 @@ private fun HeaderSection() {
 private fun PermissionCard(
     hasOverlay: Boolean,
     hasUsageStats: Boolean,
-    context: Context
+    needsSaf: Boolean,
+    context: Context,
+    onRequestSaf: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -405,6 +743,14 @@ private fun PermissionCard(
                     onGrant = {
                         context.startActivity(PermissionHelper.getUsageStatsPermissionIntent(context))
                     }
+                )
+            }
+
+            if (needsSaf) {
+                PermissionRow(
+                    title = "Storage Access (Android 11+)",
+                    desc = "Required to configure BGMI graphic presets into Android/data.",
+                    onGrant = onRequestSaf
                 )
             }
         }
@@ -462,7 +808,7 @@ private fun TelemetryPreviewCard(metrics: DeviceMetrics) {
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 MetricItem(
-                    label = "30 FPS TARGET",
+                    label = "CALIBRATED FPS",
                     value = "${metrics.calibratedFps} FPS",
                     color = when {
                         metrics.calibratedFps >= 28 -> CyberCyan

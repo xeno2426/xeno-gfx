@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.xeno.gfx.core.model.UserSettings
@@ -38,6 +39,8 @@ class SettingsRepository(
         val KEY_TRACKED_GAMES = stringSetPreferencesKey("tracked_game_packages")
         val KEY_CUSTOM_WHITELIST = stringSetPreferencesKey("user_custom_whitelist")
         val KEY_COMPACT_HUD_MODE = booleanPreferencesKey("compact_hud_mode")
+        val KEY_SAF_TREE_URI = stringPreferencesKey("saf_tree_uri")
+        val KEY_SELECTED_PRESET = stringPreferencesKey("selected_preset_name")
     }
 
     /**
@@ -62,7 +65,9 @@ class SettingsRepository(
                 ),
                 trackedGamePackages = preferences[SettingsKeys.KEY_TRACKED_GAMES] ?: emptySet(),
                 userCustomWhitelist = preferences[SettingsKeys.KEY_CUSTOM_WHITELIST] ?: emptySet(),
-                isCompactHudMode = preferences[SettingsKeys.KEY_COMPACT_HUD_MODE] ?: false
+                isCompactHudMode = preferences[SettingsKeys.KEY_COMPACT_HUD_MODE] ?: false,
+                safTreeUriString = preferences[SettingsKeys.KEY_SAF_TREE_URI],
+                selectedPresetName = preferences[SettingsKeys.KEY_SELECTED_PRESET] ?: "Potato Zero-Lag 30 FPS"
             )
         }
         .flowOn(ioDispatcher)
@@ -119,6 +124,28 @@ class SettingsRepository(
     suspend fun setCompactHudMode(enabled: Boolean) = withContext(ioDispatcher) {
         dataStore.edit { preferences ->
             preferences[SettingsKeys.KEY_COMPACT_HUD_MODE] = enabled
+        }
+    }
+
+    /**
+     * Saves the persisted SAF document tree URI string.
+     */
+    suspend fun saveSafTreeUri(uriString: String?) = withContext(ioDispatcher) {
+        dataStore.edit { preferences ->
+            if (uriString != null) {
+                preferences[SettingsKeys.KEY_SAF_TREE_URI] = uriString
+            } else {
+                preferences.remove(SettingsKeys.KEY_SAF_TREE_URI)
+            }
+        }
+    }
+
+    /**
+     * Saves the selected GFX preset name.
+     */
+    suspend fun saveSelectedPreset(presetName: String) = withContext(ioDispatcher) {
+        dataStore.edit { preferences ->
+            preferences[SettingsKeys.KEY_SELECTED_PRESET] = presetName
         }
     }
 

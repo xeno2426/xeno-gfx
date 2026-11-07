@@ -78,6 +78,9 @@ dependencies {
     // DataStore Preferences
     implementation(libs.androidx.datastore.preferences)
 
+    // DocumentFile for SAF Scoped Storage
+    implementation(libs.androidx.documentfile)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

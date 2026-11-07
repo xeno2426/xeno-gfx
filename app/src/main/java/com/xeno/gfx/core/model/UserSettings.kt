@@ -16,5 +16,7 @@ data class UserSettings(
     val hudCoordinates: Pair<Int, Int> = Pair(20, 100),
     val trackedGamePackages: Set<String> = emptySet(),
     val userCustomWhitelist: Set<String> = emptySet(),
-    val isCompactHudMode: Boolean = false
+    val isCompactHudMode: Boolean = false,
+    val safTreeUriString: String? = null,
+    val selectedPresetName: String = "Potato Zero-Lag 30 FPS"
 )
