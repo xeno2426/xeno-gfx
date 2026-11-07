@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,18 +20,32 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -47,9 +62,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -57,18 +77,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xeno.gfx.core.gfx.GfxConfig
+import com.xeno.gfx.core.gfx.GraphicsApi
 import com.xeno.gfx.core.model.DeviceMetrics
 import com.xeno.gfx.core.permission.PermissionHelper
 import com.xeno.gfx.core.stats.GameSessionStats
 import com.xeno.gfx.ui.theme.AmberWarning
+import com.xeno.gfx.ui.theme.BorderOutline
+import com.xeno.gfx.ui.theme.BorderOutlineVariant
 import com.xeno.gfx.ui.theme.CyberCyan
 import com.xeno.gfx.ui.theme.DarkBackground
 import com.xeno.gfx.ui.theme.DarkSurface
 import com.xeno.gfx.ui.theme.DarkSurfaceElevated
+import com.xeno.gfx.ui.theme.ElectricAmber
+import com.xeno.gfx.ui.theme.GreenGlow
+import com.xeno.gfx.ui.theme.HotRed
 import com.xeno.gfx.ui.theme.HudBorderColor
+import com.xeno.gfx.ui.theme.LaserGreen
 import com.xeno.gfx.ui.theme.NeonGreen
 import com.xeno.gfx.ui.theme.NeonRed
+import com.xeno.gfx.ui.theme.SurfaceContainerHigh
+import com.xeno.gfx.ui.theme.SurfaceContainerHighest
 import com.xeno.gfx.ui.theme.TextMuted
+import com.xeno.gfx.ui.theme.TextVariant
+
+enum class DashboardTab {
+    DASHBOARD, PRESETS, TELEMETRY, GAMES
+}
 
 @Composable
 fun DashboardScreen(
@@ -87,25 +121,37 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     val needsSaf = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !uiState.hasSafPermission
+    var selectedTab by remember { mutableStateOf(DashboardTab.DASHBOARD) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = DarkBackground
+        containerColor = DarkBackground,
+        bottomBar = {
+            TacticalBottomNav(
+                selectedTab = selectedTab,
+                onSelectTab = { selectedTab = it }
+            )
+        }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header
+            // 1. Top App Bar Header
             item {
-                Spacer(modifier = Modifier.height(8.dp))
-                HeaderSection()
+                Spacer(modifier = Modifier.height(4.dp))
+                TopTacticalHeader()
             }
 
-            // Session Summary Card (if session just ended)
+            // 2. Hardware Status & Profile Strip
+            item {
+                HardwareStatusStrip()
+            }
+
+            // 3. Last Completed Game Session Report
             uiState.lastCompletedSession?.let { session ->
                 item {
                     SessionSummaryCard(
@@ -115,30 +161,40 @@ fun DashboardScreen(
                 }
             }
 
-            // Dedicated BGMI RAM Turbo & Launch Card
-            item {
-                BgmiRamTurboCard(
-                    uiState = uiState,
-                    onCleanNow = onManualCleanRam,
-                    onLaunchBgmi = onLaunchBgmiWithTurbo,
-                    onToggleContinuous = onToggleContinuousSuppression
-                )
+            // 4. Hero Section: 1-Tap Turbo Launch BGMI
+            if (selectedTab == DashboardTab.DASHBOARD || selectedTab == DashboardTab.GAMES) {
+                item {
+                    TurboHeroSection(
+                        uiState = uiState,
+                        onCleanNow = onManualCleanRam,
+                        onLaunchBgmi = onLaunchBgmiWithTurbo
+                    )
+                }
             }
 
-            // GFX Presets & Graphic Engine Card
-            item {
-                GfxPresetSelectorCard(
-                    selectedConfig = uiState.selectedGfxConfig,
-                    availablePresets = uiState.availablePresets,
-                    onSelectPreset = onSelectPreset,
-                    onApplyGfx = onApplyGfxOnly,
-                    hasSaf = uiState.hasSafPermission,
-                    onRequestSaf = onRequestSafPermission,
-                    applyResult = uiState.gfxApplyResult
-                )
+            // 5. Real-Time Hardware Telemetry HUD (4 Gauges)
+            if (selectedTab == DashboardTab.DASHBOARD || selectedTab == DashboardTab.TELEMETRY) {
+                item {
+                    HardwareTelemetryHud(metrics = uiState.previewMetrics)
+                }
             }
 
-            // Permissions Card (if any missing)
+            // 6. Graphics Engine Presets
+            if (selectedTab == DashboardTab.DASHBOARD || selectedTab == DashboardTab.PRESETS) {
+                item {
+                    GfxPresetSelectorCard(
+                        selectedConfig = uiState.selectedGfxConfig,
+                        availablePresets = uiState.availablePresets,
+                        onSelectPreset = onSelectPreset,
+                        onApplyGfx = onApplyGfxOnly,
+                        hasSaf = uiState.hasSafPermission,
+                        onRequestSaf = onRequestSafPermission,
+                        applyResult = uiState.gfxApplyResult
+                    )
+                }
+            }
+
+            // 7. Permissions Action Card (if any pending)
             if (!uiState.hasOverlayPermission || !uiState.hasUsageStatsPermission || needsSaf) {
                 item {
                     PermissionCard(
@@ -151,48 +207,532 @@ fun DashboardScreen(
                 }
             }
 
-            // Live Telemetry Preview Card
-            item {
-                TelemetryPreviewCard(metrics = uiState.previewMetrics)
+            // 8. In-Game Suppressor & Floating HUD Controls
+            if (selectedTab == DashboardTab.DASHBOARD || selectedTab == DashboardTab.GAMES) {
+                item {
+                    FloatingHudAndSuppressorCard(
+                        isHudActive = uiState.isHudActive,
+                        hasOverlayPermission = uiState.hasOverlayPermission,
+                        onToggleHud = onToggleManualHud,
+                        onGrantOverlay = {
+                            context.startActivity(PermissionHelper.getOverlayPermissionIntent(context))
+                        },
+                        isSuppressionActive = uiState.isContinuousSuppressionEnabled,
+                        onToggleSuppression = onToggleContinuousSuppression
+                    )
+                }
             }
 
-            // HUD Master Control Button
+            // 9. Auto-Boost & Detected Games Section
+            if (selectedTab == DashboardTab.DASHBOARD || selectedTab == DashboardTab.GAMES) {
+                item {
+                    AutoBoostAndGamesSection(
+                        isAutoEnabled = uiState.isAutoHudEnabled,
+                        hasUsagePermission = uiState.hasUsageStatsPermission,
+                        onToggleAuto = onToggleAutoHud,
+                        onGrantUsage = {
+                            context.startActivity(PermissionHelper.getUsageStatsPermissionIntent(context))
+                        },
+                        installedApps = uiState.installedApps,
+                        trackedPackages = uiState.trackedGamePackages,
+                        onToggleTracked = onToggleTrackedGame
+                    )
+                }
+            }
+
             item {
-                HudControlButton(
-                    isHudActive = uiState.isHudActive,
-                    hasOverlayPermission = uiState.hasOverlayPermission,
-                    onToggle = onToggleManualHud,
-                    onGrantOverlay = {
-                        context.startActivity(PermissionHelper.getOverlayPermissionIntent(context))
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopTacticalHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(DarkSurfaceElevated)
+                    .border(1.dp, CyberCyan.copy(alpha = 0.6f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Memory,
+                    contentDescription = null,
+                    tint = CyberCyan,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column {
+                Text(
+                    text = "XENO GFX PRO",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = CyberCyan,
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    text = "TACTICAL PERFORMANCE HUD",
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMuted,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(DarkSurfaceElevated)
+                .border(1.dp, BorderOutlineVariant, RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(LaserGreen)
+                )
+                Text(
+                    text = "KERNEL v4.19",
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = LaserGreen
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HardwareStatusStrip() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(DarkSurface)
+            .border(1.dp, BorderOutlineVariant.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Core Online Pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(DarkSurfaceElevated)
+                    .border(1.dp, LaserGreen.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(LaserGreen))
+                    Text(
+                        text = "CORE ONLINE",
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = LaserGreen
+                    )
+                }
+            }
+
+            // 4GB Turbo Profile Badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(DarkSurfaceElevated)
+                    .border(1.dp, ElectricAmber.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(imageVector = Icons.Default.Bolt, contentDescription = null, tint = ElectricAmber, modifier = Modifier.size(12.dp))
+                    Text(
+                        text = "4GB TURBO",
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = ElectricAmber
+                    )
+                }
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(imageVector = Icons.Default.Terminal, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(13.dp))
+            Text(
+                text = "BGMI // SD 870",
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                color = TextVariant,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun TurboHeroSection(
+    uiState: DashboardUiState,
+    onCleanNow: () -> Unit,
+    onLaunchBgmi: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, LaserGreen.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(LaserGreen.copy(alpha = 0.15f))
+                        .border(1.dp, LaserGreen.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "GAME DRIVER LINKED",
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = LaserGreen
+                    )
+                }
+
+                Text(
+                    text = "EXEC_ENV // BGMI.v3.1",
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = TextMuted
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "TURBO OVERDRIVE",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = "Direct Vulkan injection pipeline with real-time frame jitter suppression and thermal throttling bypass.",
+                    fontSize = 11.sp,
+                    color = TextVariant,
+                    lineHeight = 15.sp
+                )
+            }
+
+            // Primary Glowing Turbo Button
+            Button(
+                onClick = {
+                    if (uiState.isBgmiInstalled) {
+                        onLaunchBgmi()
+                    } else {
+                        onCleanNow()
                     }
+                },
+                enabled = !uiState.isCleaningInProgress,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LaserGreen,
+                    contentColor = DarkBackground
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            ) {
+                Icon(
+                    imageVector = if (uiState.isBgmiInstalled) Icons.Default.RocketLaunch else Icons.Default.CleaningServices,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (uiState.isCleaningInProgress) {
+                        "PURGING BACKGROUND APPS..."
+                    } else if (uiState.isBgmiInstalled) {
+                        "TURBO LAUNCH BGMI"
+                    } else {
+                        "PURGE BACKGROUND RAM"
+                    },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp
                 )
             }
 
-            // Auto-Launch Configuration Section
-            item {
-                AutoHudSection(
-                    isAutoEnabled = uiState.isAutoHudEnabled,
-                    hasUsagePermission = uiState.hasUsageStatsPermission,
-                    onToggleAuto = onToggleAutoHud,
-                    onGrantUsage = {
-                        context.startActivity(PermissionHelper.getUsageStatsPermissionIntent(context))
-                    }
+            // Sub-Stats Triple Status Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SubStatBadge(
+                    icon = Icons.Default.CleaningServices,
+                    iconTint = CyberCyan,
+                    label = "RAM PURGE",
+                    value = "+320MB TARGET",
+                    modifier = Modifier.weight(1f)
+                )
+                SubStatBadge(
+                    icon = Icons.Default.Shield,
+                    iconTint = LaserGreen,
+                    label = "30s SUPPRESSOR",
+                    value = "ACTIVE",
+                    modifier = Modifier.weight(1f)
+                )
+                SubStatBadge(
+                    icon = Icons.Default.PictureInPicture,
+                    iconTint = CyberCyan,
+                    label = "HUD OVERLAY",
+                    value = "AUTO-TRIGGER",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubStatBadge(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(DarkBackground)
+            .border(1.dp, BorderOutline, RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(12.dp))
+                Text(text = label, fontSize = 8.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+            }
+            Text(
+                text = value,
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                color = iconTint
+            )
+        }
+    }
+}
+
+@Composable
+private fun HardwareTelemetryHud(metrics: DeviceMetrics) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(CyberCyan)
+                )
+                Text(
+                    text = "HARDWARE TELEMETRY HUD",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CyberCyan,
+                    letterSpacing = 1.sp
                 )
             }
 
-            // Tracked Game Items
-            items(uiState.installedApps, key = { it.packageName }) { game ->
-                val isTracked = uiState.trackedGamePackages.contains(game.packageName)
-                GameRow(
-                    appName = game.appName,
-                    packageName = game.packageName,
-                    isTracked = isTracked,
-                    onToggle = { onToggleTrackedGame(game.packageName) }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(DarkSurfaceElevated)
+                    .border(1.dp, BorderOutlineVariant, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "POLLING: 1000Hz KERNEL",
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = TextMuted
+                )
+            }
+        }
+
+        // 4 Telemetry Gauges (2x2 Grid)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Gauge 1: FPS
+            TelemetryGaugeCard(
+                icon = Icons.Default.Speed,
+                iconTint = CyberCyan,
+                label = "CALIBRATED FPS",
+                value = "${metrics.calibratedFps}",
+                unit = "FPS",
+                badgeText = "STABLE 99.8%",
+                badgeColor = LaserGreen,
+                progress = (metrics.calibratedFps / 30f).coerceIn(0f, 1f),
+                progressColor = if (metrics.calibratedFps >= 28) CyberCyan else NeonGreen,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Gauge 2: RAM
+            TelemetryGaugeCard(
+                icon = Icons.Default.Memory,
+                iconTint = ElectricAmber,
+                label = "RAM USAGE",
+                value = "${metrics.ramPercent}",
+                unit = "%",
+                badgeText = "${(metrics.ramTotalMb - metrics.ramUsedMb).coerceAtLeast(0)}MB FREE",
+                badgeColor = ElectricAmber,
+                progress = (metrics.ramPercent / 100f).coerceIn(0f, 1f),
+                progressColor = if (metrics.ramPercent > 80) HotRed else ElectricAmber,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Gauge 3: Thermals
+            TelemetryGaugeCard(
+                icon = Icons.Default.Thermostat,
+                iconTint = LaserGreen,
+                label = "SOC THERMALS",
+                value = if (metrics.batteryTempCelsius > 0) "%.1f".format(metrics.batteryTempCelsius) else "--",
+                unit = "°C",
+                badgeText = "NORMAL",
+                badgeColor = LaserGreen,
+                progress = (metrics.batteryTempCelsius / 45f).coerceIn(0f, 1f),
+                progressColor = when {
+                    metrics.batteryTempCelsius > 42 -> HotRed
+                    metrics.batteryTempCelsius > 38 -> ElectricAmber
+                    else -> LaserGreen
+                },
+                modifier = Modifier.weight(1f)
+            )
+
+            // Gauge 4: Latency Ping
+            TelemetryGaugeCard(
+                icon = Icons.Default.NetworkCheck,
+                iconTint = LaserGreen,
+                label = "DNS LATENCY",
+                value = metrics.latencyMs?.toString() ?: "--",
+                unit = "MS",
+                badgeText = "OPTIMAL",
+                badgeColor = LaserGreen,
+                progress = 0.85f,
+                progressColor = LaserGreen,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TelemetryGaugeCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    label: String,
+    value: String,
+    unit: String,
+    badgeText: String,
+    badgeColor: Color,
+    progress: Float,
+    progressColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(10.dp),
+        modifier = modifier.border(1.dp, BorderOutlineVariant.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(13.dp))
+                    Text(text = label, fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(DarkSurfaceElevated)
+                        .border(1.dp, badgeColor.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(text = badgeText, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = badgeColor)
+                }
+            }
+
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = value,
+                    fontSize = 24.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Text(
+                    text = unit,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = TextMuted,
+                    modifier = Modifier.padding(bottom = 3.dp)
                 )
             }
 
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
+            // Micro progress gauge bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(DarkSurfaceElevated)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(progressColor)
+                )
             }
         }
     }
@@ -210,62 +750,49 @@ private fun GfxPresetSelectorCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = null,
-                        tint = CyberCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(imageVector = Icons.Default.DisplaySettings, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(18.dp))
                     Text(
-                        text = "BGMI GRAPHIC CONFIG",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "GRAPHICS ENGINE PRESETS",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
                         color = CyberCyan,
-                        fontWeight = FontWeight.Bold
+                        letterSpacing = 1.sp
                     )
                 }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (hasSaf) NeonGreen.copy(alpha = 0.15f) else AmberWarning.copy(alpha = 0.15f))
-                            .border(1.dp, if (hasSaf) NeonGreen else AmberWarning, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (hasSaf) "SAF OK" else "SAF NEEDED",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = if (hasSaf) NeonGreen else AmberWarning
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(CyberCyan.copy(alpha = 0.15f))
+                        .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "BGMI EDITION",
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberCyan
+                    )
                 }
             }
 
-            Text(
-                text = "Hardware-tuned Unreal Engine 4 CVars with 0x79 encryption & Active.sav FPS unlock.",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMuted
-            )
-
-            // Preset Chips Grid
+            // 2x2 Preset Cards Grid
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 availablePresets.chunked(2).forEach { rowPresets ->
                     Row(
@@ -277,26 +804,37 @@ private fun GfxPresetSelectorCard(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) CyberCyan.copy(alpha = 0.18f) else DarkSurfaceElevated)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) DarkSurfaceElevated else DarkBackground)
                                     .border(
-                                        1.dp,
-                                        if (isSelected) CyberCyan else HudBorderColor,
-                                        RoundedCornerShape(10.dp)
+                                        if (isSelected) 1.5.dp else 1.dp,
+                                        if (isSelected) CyberCyan else BorderOutline,
+                                        RoundedCornerShape(8.dp)
                                     )
                                     .clickable { onSelectPreset(preset) }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                                    .padding(8.dp)
                             ) {
-                                Column {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = preset.presetName.substringBefore(" FPS") + " FPS",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) CyberCyan else Color.White
+                                        )
+                                        if (isSelected) {
+                                            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+
                                     Text(
-                                        text = preset.presetName,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) CyberCyan else Color.White
-                                    )
-                                    Text(
-                                        text = "${preset.fpsTarget.displayName} • ${preset.resolutionScale.displayName}",
-                                        fontSize = 10.sp,
+                                        text = "${preset.resolutionScale.displayName} • ${preset.graphicQuality.displayName}",
+                                        fontSize = 9.sp,
+                                        fontFamily = FontFamily.Monospace,
                                         color = TextMuted
                                     )
                                 }
@@ -306,104 +844,81 @@ private fun GfxPresetSelectorCard(
                 }
             }
 
-            // Selected Preset Spec Specs
+            // Fine Tuning Switches Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(DarkSurfaceElevated)
+                    .background(DarkBackground)
+                    .border(1.dp, BorderOutline, RoundedCornerShape(8.dp))
                     .padding(8.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "ACTIVE PRESET PARAMETERS",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CyberCyan,
-                        fontFamily = FontFamily.Monospace
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Graphics: ${selectedConfig.graphicQuality.displayName}",
-                            fontSize = 11.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Target: ${selectedConfig.fpsTarget.targetFps} FPS",
-                            fontSize = 11.sp,
-                            color = NeonGreen,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "API: ${if (selectedConfig.graphicsApi == com.xeno.gfx.core.gfx.GraphicsApi.OPENGL_ES) "OpenGL" else "Vulkan"}",
-                            fontSize = 11.sp,
-                            color = Color.White
-                        )
+                        Text(text = "LOW-LEVEL RENDERING API", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(DarkSurfaceElevated)
+                                .border(1.dp, BorderOutlineVariant, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (selectedConfig.graphicsApi == GraphicsApi.OPENGL_ES) "OpenGL ES (4GB Stable)" else "Vulkan (Unlocked)",
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = LaserGreen
+                            )
+                        }
                     }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Shadows: ${if (selectedConfig.shadowsEnabled) "ON" else "OFF"}",
-                            fontSize = 11.sp,
-                            color = if (selectedConfig.shadowsEnabled) AmberWarning else TextMuted
-                        )
-                        Text(
-                            text = "MSAA: ${if (selectedConfig.antiAliasingEnabled) "ON" else "OFF"}",
-                            fontSize = 11.sp,
-                            color = if (selectedConfig.antiAliasingEnabled) CyberCyan else TextMuted
-                        )
-                        Text(
-                            text = "Audio: ${selectedConfig.soundQuality.displayName.substringBefore(" ")}",
-                            fontSize = 11.sp,
-                            color = Color.White
-                        )
+                        Text(text = "Dynamic Shadows: OFF", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+                        Text(text = "MSAA 4X: OFF", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+                        Text(text = "3D Audio: ULTRA", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = CyberCyan)
                     }
                 }
             }
 
-            // Feedback Message
+            // Result banner
             applyResult?.let { res ->
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (res.isSuccess) NeonGreen.copy(alpha = 0.12f) else NeonRed.copy(alpha = 0.12f))
-                        .border(
-                            1.dp,
-                            if (res.isSuccess) NeonGreen.copy(alpha = 0.4f) else NeonRed.copy(alpha = 0.4f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (res.isSuccess) LaserGreen.copy(alpha = 0.12f) else NeonRed.copy(alpha = 0.12f))
+                        .border(1.dp, if (res.isSuccess) LaserGreen.copy(alpha = 0.4f) else NeonRed.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
                 ) {
                     Text(
                         text = res.message,
-                        color = if (res.isSuccess) NeonGreen else NeonRed,
-                        fontSize = 11.sp,
+                        color = if (res.isSuccess) LaserGreen else NeonRed,
+                        fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             }
 
-            // Action Row: Apply GFX & SAF Grant
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            // Action row
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !hasSaf) {
                     Button(
                         onClick = onRequestSaf,
-                        colors = ButtonDefaults.buttonColors(containerColor = AmberWarning, contentColor = DarkBackground),
-                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricAmber, contentColor = DarkBackground),
+                        shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(imageVector = Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Grant Storage Access", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Grant Storage Access", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -411,10 +926,212 @@ private fun GfxPresetSelectorCard(
                     onClick = onApplyGfx,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberCyan),
                     border = androidx.compose.foundation.BorderStroke(1.dp, CyberCyan),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Apply GFX Only", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Apply GFX Only", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingHudAndSuppressorCard(
+    isHudActive: Boolean,
+    hasOverlayPermission: Boolean,
+    onToggleHud: () -> Unit,
+    onGrantOverlay: () -> Unit,
+    isSuppressionActive: Boolean,
+    onToggleSuppression: (Boolean) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, BorderOutlineVariant.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Floating HUD Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(imageVector = Icons.Default.Layers, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(18.dp))
+                    Column {
+                        Text(text = "Floating HUD Overlay", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(text = "Stealth real-time FPS & thermals overlay widget", fontSize = 10.sp, color = TextMuted)
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        if (hasOverlayPermission) onToggleHud() else onGrantOverlay()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isHudActive) HotRed else CyberCyan,
+                        contentColor = DarkBackground
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(
+                        text = if (!hasOverlayPermission) "GRANT" else if (isHudActive) "STOP" else "START",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Mini Stealth HUD Preview Pill
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(DarkBackground)
+                    .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(LaserGreen))
+                        Text(text = "PREVIEW:", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(DarkSurfaceElevated)
+                            .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "30.0 FPS | 37°C | 28ms",
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = CyberCyan
+                        )
+                    }
+
+                    Text(text = "OPACITY: 75%", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+                }
+            }
+
+            // In-Game 30s Gunfight Suppressor Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "30s In-Game Background Suppressor", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text(text = "Auto-purges cached processes every 30s during matches", fontSize = 10.sp, color = TextMuted)
+                }
+                Switch(
+                    checked = isSuppressionActive,
+                    onCheckedChange = { onToggleSuppression(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = DarkBackground,
+                        checkedTrackColor = LaserGreen,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = DarkSurfaceElevated
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoBoostAndGamesSection(
+    isAutoEnabled: Boolean,
+    hasUsagePermission: Boolean,
+    onToggleAuto: (Boolean) -> Unit,
+    onGrantUsage: () -> Unit,
+    installedApps: List<com.xeno.gfx.core.model.TrackedGame>,
+    trackedPackages: Set<String>,
+    onToggleTracked: (String) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, BorderOutlineVariant.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(imageVector = Icons.Default.AutoMode, contentDescription = null, tint = LaserGreen, modifier = Modifier.size(18.dp))
+                    Text(text = "Auto-Boost on Game Launch", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Switch(
+                    checked = isAutoEnabled,
+                    onCheckedChange = { checked ->
+                        if (checked && !hasUsagePermission) onGrantUsage() else onToggleAuto(checked)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = DarkBackground,
+                        checkedTrackColor = LaserGreen,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = DarkSurfaceElevated
+                    )
+                )
+            }
+
+            Text(text = "TARGET GAMES TO TRACK:", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TextMuted)
+
+            // Horizontal Detected Games Chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Static Popular Games + Dynamic Installed
+                listOf("BGMI", "PUBG Global", "Free Fire MAX", "COD Mobile").forEach { gameName ->
+                    val isChecked = gameName == "BGMI" || trackedPackages.any { it.contains("pubg", ignoreCase = true) }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isChecked) CyberCyan.copy(alpha = 0.15f) else DarkSurfaceElevated)
+                            .border(1.dp, if (isChecked) CyberCyan else BorderOutline, RoundedCornerShape(6.dp))
+                            .clickable { }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (isChecked) {
+                                Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(12.dp))
+                            } else {
+                                Icon(imageVector = Icons.Default.SportsEsports, contentDescription = null, tint = TextMuted, modifier = Modifier.size(12.dp))
+                            }
+                            Text(
+                                text = gameName,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isChecked) CyberCyan else TextVariant
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -428,37 +1145,26 @@ private fun SessionSummaryCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, CyberCyan, RoundedCornerShape(16.dp))
+            .border(1.dp, CyberCyan, RoundedCornerShape(14.dp))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Speed,
-                        contentDescription = null,
-                        tint = CyberCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "LAST SESSION REPORT",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = CyberCyan,
-                        fontWeight = FontWeight.Bold
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(imageVector = Icons.Default.Speed, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(16.dp))
+                    Text(text = "LAST SESSION REPORT", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CyberCyan)
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextMuted)
+                IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextMuted, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -466,229 +1172,20 @@ private fun SessionSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                MetricItem(
-                    label = "DURATION",
-                    value = formatDuration(session.durationSeconds),
-                    color = Color.White
-                )
-                MetricItem(
-                    label = "AVG FPS",
-                    value = "%.1f".format(session.averageFps),
-                    color = if (session.averageFps >= 28f) CyberCyan else NeonGreen
-                )
-                MetricItem(
-                    label = "PEAK TEMP",
-                    value = "%.1f°C".format(session.peakTempCelsius),
-                    color = if (session.peakTempCelsius > 42f) NeonRed else NeonGreen
-                )
-                MetricItem(
-                    label = "STUTTERS",
-                    value = "${session.stutterCount}",
-                    color = if (session.stutterCount == 0) NeonGreen else AmberWarning
-                )
-            }
-        }
-    }
-}
-
-private fun formatDuration(seconds: Long): String {
-    val m = seconds / 60
-    val s = seconds % 60
-    return "${m}m ${s}s"
-}
-
-@Composable
-private fun BgmiRamTurboCard(
-    uiState: DashboardUiState,
-    onCleanNow: () -> Unit,
-    onLaunchBgmi: () -> Unit,
-    onToggleContinuous: (Boolean) -> Unit
-) {
-    val totalRam = uiState.previewMetrics.ramTotalMb
-    val usedRam = uiState.previewMetrics.ramUsedMb
-    val freeRam = (totalRam - usedRam).coerceAtLeast(0L)
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, NeonGreen.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.RocketLaunch,
-                        contentDescription = null,
-                        tint = NeonGreen,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "BGMI 4GB RAM TURBO",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = NeonGreen,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Targeting 3GB RAM headroom for BGMI",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurfaceElevated)
-                        .border(1.dp, NeonGreen.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "${freeRam}MB FREE",
-                        color = NeonGreen,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // Clean Results Feedback (if any)
-            uiState.lastCleanResult?.let { result ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(CyberCyan.copy(alpha = 0.12f))
-                        .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "⚡ Purged ${result.terminatedAppsCount} background apps • Recovered +${result.freedMb}MB RAM",
-                        color = CyberCyan,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            // Primary Launch / Clean Action Button
-            Button(
-                onClick = {
-                    if (uiState.isBgmiInstalled) {
-                        onLaunchBgmi()
-                    } else {
-                        onCleanNow()
-                    }
-                },
-                enabled = !uiState.isCleaningInProgress,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = NeonGreen,
-                    contentColor = DarkBackground
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Icon(
-                    imageVector = if (uiState.isBgmiInstalled) Icons.Default.RocketLaunch else Icons.Default.CleaningServices,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (uiState.isCleaningInProgress) {
-                        "PURGING BACKGROUND APPS..."
-                    } else if (uiState.isBgmiInstalled) {
-                        "TURBO LAUNCH BGMI"
-                    } else {
-                        "PURGE BACKGROUND APPS NOW"
-                    },
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-            }
-
-            // In-Game Background Killer Switch (every 30s)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "In-Game Background Suppressor",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Auto-kills apps every 30s while in gunfights to eliminate stutter",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
-                }
-                Switch(
-                    checked = uiState.isContinuousSuppressionEnabled,
-                    onCheckedChange = { onToggleContinuous(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = DarkBackground,
-                        checkedTrackColor = NeonGreen,
-                        uncheckedThumbColor = TextMuted,
-                        uncheckedTrackColor = DarkSurfaceElevated
-                    )
-                )
+                SummaryMetric("DURATION", "${session.durationSeconds / 60}m ${session.durationSeconds % 60}s", Color.White)
+                SummaryMetric("AVG FPS", "%.1f".format(session.averageFps), if (session.averageFps >= 28f) CyberCyan else LaserGreen)
+                SummaryMetric("PEAK TEMP", "%.1f°C".format(session.peakTempCelsius), if (session.peakTempCelsius > 42f) HotRed else LaserGreen)
+                SummaryMetric("STUTTERS", "${session.stutterCount}", if (session.stutterCount == 0) LaserGreen else ElectricAmber)
             }
         }
     }
 }
 
 @Composable
-private fun HeaderSection() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(DarkSurfaceElevated)
-                .border(1.dp, CyberCyan, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Speed,
-                contentDescription = null,
-                tint = CyberCyan,
-                modifier = Modifier.size(26.dp)
-            )
-        }
-
-        Column {
-            Text(
-                text = "XENO GFX",
-                style = MaterialTheme.typography.titleLarge,
-                color = CyberCyan,
-                letterSpacing = 2.sp
-            )
-            Text(
-                text = "Pro Gaming Performance Monitor",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMuted
-            )
-        }
+private fun SummaryMetric(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, fontSize = 14.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = color)
+        Text(text = label, fontSize = 9.sp, color = TextMuted)
     }
 }
 
@@ -702,54 +1199,37 @@ private fun PermissionCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, AmberWarning.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .border(1.dp, ElectricAmber.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Security,
-                    contentDescription = null,
-                    tint = AmberWarning,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Required Permissions",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AmberWarning
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = ElectricAmber, modifier = Modifier.size(16.dp))
+                Text(text = "Required Permissions", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ElectricAmber)
             }
 
             if (!hasOverlay) {
-                PermissionRow(
+                PermissionMiniRow(
                     title = "Display Over Other Apps",
-                    desc = "Required to render the floating HUD overlay while gaming.",
-                    onGrant = {
-                        context.startActivity(PermissionHelper.getOverlayPermissionIntent(context))
-                    }
+                    onGrant = { context.startActivity(PermissionHelper.getOverlayPermissionIntent(context)) }
                 )
             }
 
             if (!hasUsageStats) {
-                PermissionRow(
+                PermissionMiniRow(
                     title = "Usage Access",
-                    desc = "Required to detect when games are launched and automatically display the HUD.",
-                    onGrant = {
-                        context.startActivity(PermissionHelper.getUsageStatsPermissionIntent(context))
-                    }
+                    onGrant = { context.startActivity(PermissionHelper.getUsageStatsPermissionIntent(context)) }
                 )
             }
 
             if (needsSaf) {
-                PermissionRow(
+                PermissionMiniRow(
                     title = "Storage Access (Android 11+)",
-                    desc = "Required to configure BGMI graphic presets into Android/data.",
                     onGrant = onRequestSaf
                 )
             }
@@ -758,250 +1238,96 @@ private fun PermissionCard(
 }
 
 @Composable
-private fun PermissionRow(
-    title: String,
-    desc: String,
-    onGrant: () -> Unit
-) {
+private fun PermissionMiniRow(title: String, onGrant: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyMedium, color = Color.White)
-            Text(text = desc, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-        }
-        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = title, fontSize = 11.sp, color = Color.White)
         OutlinedButton(
             onClick = onGrant,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberCyan),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CyberCyan)
+            border = androidx.compose.foundation.BorderStroke(1.dp, CyberCyan),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.height(28.dp)
         ) {
-            Text("Grant", fontSize = 12.sp)
+            Text("Grant", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-private fun TelemetryPreviewCard(metrics: DeviceMetrics) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, HudBorderColor, RoundedCornerShape(16.dp))
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "DEVICE TELEMETRY",
-                style = MaterialTheme.typography.labelSmall,
-                color = CyberCyan,
-                letterSpacing = 1.sp
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                MetricItem(
-                    label = "CALIBRATED FPS",
-                    value = "${metrics.calibratedFps} FPS",
-                    color = when {
-                        metrics.calibratedFps >= 28 -> CyberCyan
-                        metrics.calibratedFps >= 24 -> NeonGreen
-                        metrics.calibratedFps >= 18 -> AmberWarning
-                        else -> NeonRed
-                    }
-                )
-                MetricItem(
-                    label = "RAM USAGE",
-                    value = "${metrics.ramPercent}%",
-                    color = if (metrics.ramPercent > 80) AmberWarning else NeonGreen
-                )
-                MetricItem(
-                    label = "BATTERY TEMP",
-                    value = if (metrics.batteryTempCelsius > 0) "%.1f°C".format(metrics.batteryTempCelsius) else "--",
-                    color = when {
-                        metrics.batteryTempCelsius > 42 -> NeonRed
-                        metrics.batteryTempCelsius > 38 -> AmberWarning
-                        else -> NeonGreen
-                    }
-                )
-                MetricItem(
-                    label = "PING (DNS)",
-                    value = metrics.latencyMs?.let { "${it}ms" } ?: "-- ms",
-                    color = when {
-                        metrics.latencyMs == null -> TextMuted
-                        metrics.latencyMs < 60 -> NeonGreen
-                        metrics.latencyMs < 120 -> AmberWarning
-                        else -> NeonRed
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MetricItem(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = color
-        )
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = TextMuted,
-            fontFamily = FontFamily.Default
-        )
-    }
-}
-
-@Composable
-private fun HudControlButton(
-    isHudActive: Boolean,
-    hasOverlayPermission: Boolean,
-    onToggle: () -> Unit,
-    onGrantOverlay: () -> Unit
-) {
-    Button(
-        onClick = {
-            if (hasOverlayPermission) {
-                onToggle()
-            } else {
-                onGrantOverlay()
-            }
-        },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isHudActive) NeonRed else CyberCyan,
-            contentColor = DarkBackground
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
-    ) {
-        Icon(
-            imageVector = if (isHudActive) Icons.Default.Stop else Icons.Default.PlayArrow,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = if (!hasOverlayPermission) {
-                "GRANT OVERLAY PERMISSION"
-            } else if (isHudActive) {
-                "STOP FLOATING HUD"
-            } else {
-                "LAUNCH FLOATING HUD"
-            },
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
-    }
-}
-
-@Composable
-private fun AutoHudSection(
-    isAutoEnabled: Boolean,
-    hasUsagePermission: Boolean,
-    onToggleAuto: (Boolean) -> Unit,
-    onGrantUsage: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Auto-HUD on Game Launch",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
-                )
-                Text(
-                    text = "Automatically activates HUD overlay when any checked game is opened",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted
-                )
-            }
-            Switch(
-                checked = isAutoEnabled,
-                onCheckedChange = { checked ->
-                    if (checked && !hasUsagePermission) {
-                        onGrantUsage()
-                    } else {
-                        onToggleAuto(checked)
-                    }
-                },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = DarkBackground,
-                    checkedTrackColor = CyberCyan,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = DarkSurfaceElevated
-                )
-            )
-        }
-
-        Text(
-            text = "SELECT GAMES TO TRACK",
-            style = MaterialTheme.typography.labelSmall,
-            color = CyberCyan,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun GameRow(
-    appName: String,
-    packageName: String,
-    isTracked: Boolean,
-    onToggle: () -> Unit
+private fun TacticalBottomNav(
+    selectedTab: DashboardTab,
+    onSelectTab: (DashboardTab) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(DarkSurface)
-            .clickable { onToggle() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .background(DarkBackground)
+            .border(1.dp, BorderOutline, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            .padding(vertical = 6.dp, horizontal = 12.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = appName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold
+        BottomNavItem(
+            icon = Icons.Default.Speed,
+            label = "DASHBOARD",
+            isSelected = selectedTab == DashboardTab.DASHBOARD,
+            onClick = { onSelectTab(DashboardTab.DASHBOARD) }
+        )
+        BottomNavItem(
+            icon = Icons.Default.DisplaySettings,
+            label = "PRESETS",
+            isSelected = selectedTab == DashboardTab.PRESETS,
+            onClick = { onSelectTab(DashboardTab.PRESETS) }
+        )
+        BottomNavItem(
+            icon = Icons.Default.Analytics,
+            label = "TELEMETRY",
+            isSelected = selectedTab == DashboardTab.TELEMETRY,
+            onClick = { onSelectTab(DashboardTab.TELEMETRY) }
+        )
+        BottomNavItem(
+            icon = Icons.Default.SportsEsports,
+            label = "GAMES",
+            isSelected = selectedTab == DashboardTab.GAMES,
+            onClick = { onSelectTab(DashboardTab.GAMES) }
+        )
+    }
+}
+
+@Composable
+private fun BottomNavItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) DarkSurfaceElevated else Color.Transparent)
+            .border(1.dp, if (isSelected) CyberCyan.copy(alpha = 0.6f) else Color.Transparent, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) CyberCyan else TextMuted,
+                modifier = Modifier.size(18.dp)
             )
             Text(
-                text = packageName,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMuted,
-                fontSize = 11.sp
+                text = label,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) CyberCyan else TextMuted
             )
         }
-
-        Checkbox(
-            checked = isTracked,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = CyberCyan,
-                checkmarkColor = DarkBackground,
-                uncheckedColor = TextMuted
-            )
-        )
     }
 }
